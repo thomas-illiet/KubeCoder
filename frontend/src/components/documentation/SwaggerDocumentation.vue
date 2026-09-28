@@ -140,6 +140,10 @@ onBeforeUnmount(() => {
   margin: 32px 0;
 }
 
+.swagger-documentation :deep(.swagger-ui .information-container) {
+  display: none;
+}
+
 .swagger-documentation :deep(.swagger-ui .topbar) {
   display: none;
 }
