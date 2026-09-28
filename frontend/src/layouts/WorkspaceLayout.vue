@@ -5,7 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useNotifications } from '../composables/useNotifications'
 import { useAuth } from '../composables/useAuth'
 import { useOrganizations } from '../composables/useOrganizations'
-import { canShowWorkspaceSwitch, documentationTarget, isSearchShortcut, type LayoutMode } from './navigation'
+import { documentationTarget, isSearchShortcut, type LayoutMode } from './navigation'
 
 type NavigationItem = { title: string; icon: string; to: string }
 type NavigationGroup = { title: string; items: NavigationItem[] }
@@ -106,7 +106,10 @@ const documentationItem = computed<NavigationItem>(() => ({
   icon: 'mdi-book-open-page-variant-outline',
   to: documentationTarget(props.mode, organizationService.state.current?.slug),
 }))
-const navigationItems = computed(() => [...navigationGroups.value.flatMap((group) => group.items), documentationItem.value])
+const navigationItems = computed(() => [
+  ...navigationGroups.value.flatMap((group) => group.items),
+  ...(props.mode === 'organization' ? [documentationItem.value] : []),
+])
 const filteredNavigationItems = computed(() => {
   const term = commandQuery.value.trim().toLocaleLowerCase('en')
   if (!term) return navigationItems.value
@@ -118,7 +121,7 @@ const switchTarget = computed(() => props.mode === 'admin' ? (organizationServic
 const switchTitle = computed(() => props.mode === 'admin' ? 'Back to organization' : 'Administration')
 const switchSubtitle = computed(() => props.mode === 'admin' ? 'Return to the developer workspace' : 'Open the dedicated console')
 const switchIcon = computed(() => props.mode === 'admin' ? 'mdi-arrow-left' : 'mdi-shield-crown-outline')
-const showWorkspaceSwitch = computed(() => canShowWorkspaceSwitch(props.mode, isAdmin.value))
+const showWorkspaceSwitch = computed(() => props.mode === 'admin')
 const profileTarget = computed(() => props.mode === 'admin' ? '/admin/profile' : `${organizationBase.value}/profile`)
 const title = computed(() => route.meta.title as string)
 const subtitle = computed(() => route.meta.subtitle as string)
@@ -210,7 +213,7 @@ function resetCommandSearch() {
 
       <template #append>
         <div class="px-3 pb-4">
-          <v-list nav density="compact" class="layout-switch pa-0 mb-3">
+          <v-list v-if="mode === 'organization'" nav density="compact" class="layout-switch pa-0 mb-3">
             <v-list-item :prepend-icon="documentationItem.icon" :title="documentationItem.title" :to="documentationItem.to" rounded="lg" />
           </v-list>
           <v-list v-if="showWorkspaceSwitch" nav density="compact" class="layout-switch pa-0 mb-3">
@@ -226,7 +229,17 @@ function resetCommandSearch() {
       <v-spacer />
       <v-btn class="search-trigger d-none d-md-flex" variant="outlined" color="default" aria-keyshortcuts="Meta+K Control+K" @click="commandOpen = true"><v-icon icon="mdi-magnify" size="20" class="mr-2" />Search<span class="shortcut">⌘ K</span></v-btn>
       <v-btn icon="mdi-magnify" variant="text" class="d-md-none" aria-label="Search" @click="commandOpen = true" />
-      <v-menu><template #activator="{ props: menuProps }"><v-btn v-bind="menuProps" icon class="ml-3 user-avatar" aria-label="Profile menu">{{ initials }}</v-btn></template><v-list width="230" class="pa-2"><v-list-item :title="displayName" :subtitle="username || 'OpenID Connect user'" /><v-divider class="my-2" /><v-list-item title="Profile" prepend-icon="mdi-account-circle-outline" @click="router.push(profileTarget)" /><v-list-item title="Sign out" prepend-icon="mdi-logout" @click="router.push('/logout')" /></v-list></v-menu>
+      <v-menu>
+        <template #activator="{ props: menuProps }"><v-btn v-bind="menuProps" icon class="ml-3 user-avatar" aria-label="Profile menu">{{ initials }}</v-btn></template>
+        <v-list width="230" class="pa-2">
+          <v-list-item :title="displayName" :subtitle="username || 'OpenID Connect user'" />
+          <v-divider class="my-2" />
+          <v-list-item title="Profile" prepend-icon="mdi-account-circle-outline" @click="router.push(profileTarget)" />
+          <v-list-item v-if="mode === 'organization' && isAdmin" title="Administration" prepend-icon="mdi-shield-crown-outline" @click="router.push('/admin')" />
+          <v-divider class="my-2" />
+          <v-list-item title="Sign out" prepend-icon="mdi-logout" @click="router.push('/logout')" />
+        </v-list>
+      </v-menu>
     </v-app-bar>
 
     <v-main>
