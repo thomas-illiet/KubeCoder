@@ -52,7 +52,6 @@ async function signInWithOidc() {
       </v-form>
       <div class="auth-divider"><span>or</span></div>
       <v-btn block variant="outlined" size="large" prepend-icon="mdi-shield-account-outline" :loading="state.loading" @click="signInWithOidc">Continue with SSO</v-btn>
-      <div class="security-note mt-5"><v-icon icon="mdi-lock-check-outline" color="success" /><span>Password authentication is reserved for the future LDAP backend. SSO uses OpenID Connect with PKCE.</span></div>
     </div>
   </v-card>
 </template>

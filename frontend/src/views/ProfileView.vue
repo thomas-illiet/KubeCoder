@@ -5,7 +5,7 @@ import StatusChip from '../components/StatusChip.vue'
 import { useAuth } from '../composables/useAuth'
 import { useNotifications } from '../composables/useNotifications'
 
-const { displayName: oidcDisplayName, email, username, initials, profile } = useAuth()
+const { displayName: oidcDisplayName, email, username, initials, subject } = useAuth()
 const displayName = ref(oidcDisplayName.value)
 const jobTitle = ref('Platform administrator')
 const timezone = ref('Europe/Paris')
@@ -14,7 +14,7 @@ const { success } = useNotifications()
 
 <template>
   <div class="profile-grid">
-    <SectionCard title="Account" subtitle="Identity provided by your authentication provider">
+    <SectionCard title="Account" subtitle="Application profile synchronized from your authenticated identity">
       <div class="profile-summary">
         <div class="profile-avatar">{{ initials }}</div>
         <div><h2>{{ oidcDisplayName }}</h2><p>{{ email || username }}</p><StatusChip label="Active account" color="success" icon="mdi-check-circle-outline" /></div>
@@ -22,7 +22,7 @@ const { success } = useNotifications()
       <v-divider />
       <div class="pa-5">
         <div class="profile-detail"><span>Authentication</span><strong>OpenID Connect</strong></div>
-        <div class="profile-detail"><span>Account ID</span><code>{{ profile?.sub }}</code></div>
+        <div class="profile-detail"><span>Account ID</span><code>{{ subject }}</code></div>
         <div class="profile-detail"><span>Username</span><strong>{{ username }}</strong></div>
       </div>
     </SectionCard>

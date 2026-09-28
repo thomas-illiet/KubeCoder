@@ -23,6 +23,7 @@ export const router = createRouter({
     {
       path: '/admin',
       component: () => import('./layouts/AdminLayout.vue'),
+      meta: { requiresAdmin: true },
       children: [
         { path: '', component: () => import('./views/DashboardView.vue'), meta: { section: 'Administration', title: 'Overview', subtitle: 'Platform administration' } },
         { path: 'agents', component: () => import('./views/AgentsView.vue'), meta: { section: 'Administration', title: 'Agents', subtitle: 'Definitions, versions, and publishing' } },
@@ -42,9 +43,9 @@ export const router = createRouter({
         { path: 'auth/callback', component: () => import('./views/AuthCallbackView.vue'), meta: { public: true } },
         { path: 'logout', component: () => import('./views/LogoutView.vue') },
         { path: 'logout/callback', component: () => import('./views/LogoutCallbackView.vue'), meta: { public: true } },
+        { path: 'forbidden', component: () => import('./views/ForbiddenView.vue') },
       ],
     },
     { path: '/:pathMatch(.*)*', redirect: '/organization' },
   ],
 })
-

@@ -1,0 +1,9 @@
+{
+  "apiBaseUrl": "http://localhost:8080",
+  "oidc": {
+    "authority": "http://localhost:30080/realms/kubecoder",
+    "clientId": "kubecoder-web",
+    "redirectUri": "http://localhost:5173/auth/callback",
+    "postLogoutRedirectUri": "http://localhost:5173/logout/callback"
+  }
+}

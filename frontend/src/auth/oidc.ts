@@ -1,18 +1,14 @@
 import { UserManager, WebStorageStateStore, type User, type UserManagerSettings } from 'oidc-client-ts'
-import { computed, reactive, readonly } from 'vue'
+import { computed, reactive, readonly, type App, type ComputedRef, type DeepReadonly, type InjectionKey } from 'vue'
+import { fetchCurrentUser, type CurrentUser } from '../api/users'
+import type { RuntimeConfig } from '../runtime/config'
 import { authenticationError, normalizeReturnTo } from './navigation'
-
-export interface OidcProfile {
-  sub: string
-  name?: string
-  preferred_username?: string
-  email?: string
-}
 
 interface AuthState {
   initialized: boolean
   loading: boolean
   user: User | null
+  currentUser: CurrentUser | null
   error: string | null
 }
 
@@ -20,114 +16,167 @@ interface RedirectState {
   returnTo?: string
 }
 
-const authority = import.meta.env.VITE_OIDC_AUTHORITY ?? 'http://localhost:30080/realms/kubecoder'
-const clientId = import.meta.env.VITE_OIDC_CLIENT_ID ?? 'kubecoder-web'
-const redirectUri = import.meta.env.VITE_OIDC_REDIRECT_URI ?? `${window.location.origin}/auth/callback`
-const postLogoutRedirectUri = import.meta.env.VITE_OIDC_POST_LOGOUT_REDIRECT_URI ?? `${window.location.origin}/logout/callback`
-
-export const oidcSettings: UserManagerSettings = {
-  authority,
-  client_id: clientId,
-  redirect_uri: redirectUri,
-  post_logout_redirect_uri: postLogoutRedirectUri,
-  response_type: 'code',
-  scope: 'openid profile email',
-  automaticSilentRenew: true,
-  monitorSession: true,
-  userStore: new WebStorageStateStore({ store: window.sessionStorage }),
+export interface AuthApi {
+  state: DeepReadonly<AuthState>
+  isAuthenticated: ComputedRef<boolean>
+  isAdmin: ComputedRef<boolean>
+  initialize(): Promise<void>
+  login(returnTo?: string): Promise<void>
+  completeLogin(): Promise<string>
+  logout(): Promise<void>
+  completeLogout(): Promise<void>
 }
 
-const manager = new UserManager(oidcSettings)
-const state = reactive<AuthState>({
-  initialized: false,
-  loading: false,
-  user: null,
-  error: null,
-})
+export const authKey: InjectionKey<AuthApi> = Symbol('kubecoder-auth')
 
-manager.events.addUserLoaded((user) => {
-  state.user = user
-  state.error = null
-})
-manager.events.addUserUnloaded(() => {
-  state.user = null
-})
-manager.events.addAccessTokenExpired(() => {
-  state.user = null
-})
-manager.events.addSilentRenewError((error) => {
-  state.error = error.message
-})
+interface UserManagerPort {
+  events: Pick<UserManager['events'], 'addUserLoaded' | 'addUserUnloaded' | 'addAccessTokenExpired' | 'addSilentRenewError'>
+  getUser(): Promise<User | null>
+  removeUser(): Promise<void>
+  signinRedirect(args: { state: RedirectState }): Promise<void>
+  signinRedirectCallback(): Promise<User>
+  signoutRedirect(): Promise<void>
+  signoutRedirectCallback(): Promise<unknown>
+}
 
-export const auth = {
-  state: readonly(state),
-  isAuthenticated: computed(() => Boolean(state.user && !state.user.expired)),
-  profile: computed(() => (state.user?.profile ?? null) as OidcProfile | null),
+interface AuthDependencies {
+  manager?: UserManagerPort
+  fetcher?: typeof fetch
+}
 
-  async initialize(): Promise<void> {
-    state.loading = true
-    state.error = null
-    try {
-      const user = await manager.getUser()
-      state.user = user && !user.expired ? user : null
-      if (user?.expired) await manager.removeUser()
-    } catch (error) {
-      state.user = null
-      state.error = authenticationError(error)
-    } finally {
-      state.loading = false
-      state.initialized = true
+export function createAuth(config: RuntimeConfig, dependencies: AuthDependencies = {}): AuthApi {
+  const manager: UserManagerPort = dependencies.manager ?? new UserManager({
+    authority: config.oidc.authority,
+    client_id: config.oidc.clientId,
+    redirect_uri: config.oidc.redirectUri,
+    post_logout_redirect_uri: config.oidc.postLogoutRedirectUri,
+    response_type: 'code', scope: 'openid profile email', automaticSilentRenew: true, monitorSession: true,
+    userStore: new WebStorageStateStore({ store: window.sessionStorage }),
+  } satisfies UserManagerSettings)
+  const fetcher = dependencies.fetcher ?? fetch
+  const state = reactive<AuthState>({ initialized: false, loading: false, user: null, currentUser: null, error: null })
+  let synchronizedToken = ''
+  let synchronization: Promise<void> | null = null
+
+  async function clearLocalSession(message?: string): Promise<void> {
+    synchronizedToken = ''
+    state.user = null
+    state.currentUser = null
+    if (message) state.error = message
+    await manager.removeUser()
+  }
+
+  async function synchronizeUser(user: User): Promise<void> {
+    if (!user.access_token) {
+      await clearLocalSession('The OpenID Connect session does not contain an access token.')
+      throw new Error(state.error ?? 'Access token missing.')
     }
-  },
-
-  async login(returnTo = '/organization'): Promise<void> {
-    state.loading = true
-    state.error = null
-    try {
-      await manager.signinRedirect({ state: { returnTo } satisfies RedirectState })
-    } catch (error) {
-      state.error = authenticationError(error)
-      state.loading = false
-      throw error
-    }
-  },
-
-  async completeLogin(): Promise<string> {
-    state.loading = true
-    state.error = null
-    try {
-      const user = await manager.signinRedirectCallback()
+    if (state.currentUser && synchronizedToken === user.access_token) {
       state.user = user
-      const redirectState = user.state as RedirectState | undefined
-      return normalizeReturnTo(redirectState?.returnTo)
-    } catch (error) {
-      state.error = authenticationError(error)
-      throw error
-    } finally {
-      state.loading = false
+      return
     }
-  },
+    if (synchronization) return synchronization
+    synchronization = (async () => {
+      try {
+        const currentUser = await fetchCurrentUser(config.apiBaseUrl, user.access_token, fetcher)
+        state.user = user
+        state.currentUser = currentUser
+        synchronizedToken = user.access_token
+        state.error = null
+      } catch (error) {
+        await clearLocalSession(authenticationError(error))
+        throw error
+      } finally {
+        synchronization = null
+      }
+    })()
+    return synchronization
+  }
 
-  async logout(): Promise<void> {
-    state.loading = true
-    state.error = null
-    try {
-      await manager.signoutRedirect()
-    } catch (error) {
-      state.error = authenticationError(error)
-      state.loading = false
-      throw error
-    }
-  },
+  manager.events.addUserLoaded((user) => {
+    void synchronizeUser(user).catch(() => undefined)
+  })
+  manager.events.addUserUnloaded(() => {
+    synchronizedToken = ''
+    state.user = null
+    state.currentUser = null
+  })
+  manager.events.addAccessTokenExpired(() => {
+    void clearLocalSession('Your session has expired. Please sign in again.').catch(() => undefined)
+  })
+  manager.events.addSilentRenewError((error) => {
+    void clearLocalSession(authenticationError(error)).catch(() => undefined)
+  })
 
-  async completeLogout(): Promise<void> {
-    state.loading = true
-    try {
-      await manager.signoutRedirectCallback()
-      await manager.removeUser()
-      state.user = null
-    } finally {
-      state.loading = false
-    }
-  },
+  return {
+    state: readonly(state),
+    isAuthenticated: computed(() => Boolean(state.user && state.currentUser && !state.user.expired)),
+    isAdmin: computed(() => state.currentUser?.is_admin === true),
+
+    async initialize(): Promise<void> {
+      state.loading = true
+      state.error = null
+      try {
+        const user = await manager.getUser()
+        if (user && !user.expired) await synchronizeUser(user)
+        else if (user?.expired) await clearLocalSession()
+      } catch (error) {
+        if (!state.error) await clearLocalSession(authenticationError(error))
+      } finally {
+        state.loading = false
+        state.initialized = true
+      }
+    },
+
+    async login(returnTo = '/organization'): Promise<void> {
+      state.loading = true
+      state.error = null
+      try {
+        await manager.signinRedirect({ state: { returnTo } satisfies RedirectState })
+      } catch (error) {
+        state.error = authenticationError(error)
+        state.loading = false
+        throw error
+      }
+    },
+
+    async completeLogin(): Promise<string> {
+      state.loading = true
+      state.error = null
+      try {
+        const user = await manager.signinRedirectCallback()
+        await synchronizeUser(user)
+        const redirectState = user.state as RedirectState | undefined
+        return normalizeReturnTo(redirectState?.returnTo)
+      } finally {
+        state.loading = false
+      }
+    },
+
+    async logout(): Promise<void> {
+      state.loading = true
+      state.error = null
+      try {
+        await manager.signoutRedirect()
+      } catch (error) {
+        state.error = authenticationError(error)
+        state.loading = false
+        throw error
+      }
+    },
+
+    async completeLogout(): Promise<void> {
+      state.loading = true
+      try {
+        await manager.signoutRedirectCallback()
+        await clearLocalSession()
+      } finally {
+        state.loading = false
+      }
+    },
+  }
+}
+
+export function installAuth(app: App, auth: AuthApi): void {
+  app.provide(authKey, auth)
 }

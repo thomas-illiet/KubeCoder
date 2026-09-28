@@ -4,8 +4,8 @@ import { useDisplay } from 'vuetify'
 import { useRoute, useRouter } from 'vue-router'
 import { useNotifications } from '../composables/useNotifications'
 import { useAuth } from '../composables/useAuth'
+import { canShowWorkspaceSwitch, type LayoutMode } from './navigation'
 
-type LayoutMode = 'organization' | 'admin'
 type NavigationItem = { title: string; icon: string; to: string }
 type NavigationGroup = { title: string; items: NavigationItem[] }
 
@@ -14,7 +14,7 @@ const { smAndDown: mobile } = useDisplay()
 const route = useRoute()
 const router = useRouter()
 const { success } = useNotifications()
-const { displayName, username, initials } = useAuth()
+const { displayName, username, initials, isAdmin } = useAuth()
 const drawer = ref(!mobile.value)
 const rail = ref(false)
 const commandOpen = ref(false)
@@ -119,6 +119,7 @@ const switchTarget = computed(() => props.mode === 'admin' ? '/organization' : '
 const switchTitle = computed(() => props.mode === 'admin' ? 'Back to organization' : 'Administration')
 const switchSubtitle = computed(() => props.mode === 'admin' ? 'Return to the developer workspace' : 'Open the dedicated console')
 const switchIcon = computed(() => props.mode === 'admin' ? 'mdi-arrow-left' : 'mdi-shield-crown-outline')
+const showWorkspaceSwitch = computed(() => canShowWorkspaceSwitch(props.mode, isAdmin.value))
 const profileTarget = computed(() => props.mode === 'admin' ? '/admin/profile' : '/organization/profile')
 const title = computed(() => route.meta.title as string)
 const subtitle = computed(() => route.meta.subtitle as string)
@@ -196,7 +197,7 @@ function resetCommandSearch() {
 
       <template #append>
         <div class="px-3 pb-4">
-          <v-list nav density="compact" class="layout-switch pa-0 mb-3">
+          <v-list v-if="showWorkspaceSwitch" nav density="compact" class="layout-switch pa-0 mb-3">
             <v-list-item :prepend-icon="switchIcon" :title="switchTitle" :subtitle="switchSubtitle" :to="switchTarget" rounded="lg" />
           </v-list>
         </div>

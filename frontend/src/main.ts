@@ -1,4 +1,4 @@
-import { createApp } from 'vue'
+import { createApp, watch } from 'vue'
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
@@ -7,9 +7,11 @@ import '@mdi/font/css/materialdesignicons.css'
 import './styles.css'
 import App from './App.vue'
 import IconSelect from './components/IconSelect.vue'
-import { auth } from './auth/oidc'
+import StartupErrorView from './views/StartupErrorView.vue'
+import { createAuth, installAuth } from './auth/oidc'
 import { installAuthGuard } from './auth/guard'
 import { router } from './router'
+import { loadRuntimeConfig } from './runtime/config'
 
 const vuetify = createVuetify({
   components,
@@ -43,9 +45,19 @@ const vuetify = createVuetify({
 })
 
 async function bootstrap() {
+  const config = await loadRuntimeConfig()
+  const auth = createAuth(config)
   await auth.initialize()
   installAuthGuard(router, auth)
-  createApp(App).component('IconSelect', IconSelect).use(router).use(vuetify).mount('#app')
+  watch(auth.isAuthenticated, (authenticated, wasAuthenticated) => {
+    if (wasAuthenticated && !authenticated) void router.replace('/login')
+  })
+  const app = createApp(App).component('IconSelect', IconSelect).use(router).use(vuetify)
+  installAuth(app, auth)
+  app.mount('#app')
 }
 
-void bootstrap()
+void bootstrap().catch((error: unknown) => {
+  const message = error instanceof Error ? error.message : 'The runtime configuration could not be loaded.'
+  createApp(StartupErrorView, { message }).use(vuetify).mount('#app')
+})

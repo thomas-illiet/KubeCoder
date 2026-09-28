@@ -11,10 +11,30 @@ helm upgrade --install kubecoder-auth ./deploy/helm/kubecoder-keycloak \
   --namespace kubecoder-auth --create-namespace --wait --timeout 10m
 
 cd frontend
-cp .env.example .env.local
 npm install
 npm run dev
 ```
+
+Le frontend charge sa configuration à l'exécution depuis
+[`frontend/public/config.json`](./frontend/public/config.json). Ce fichier définit
+l'URL du backend ainsi que les paramètres OIDC et doit être remplacé par la
+configuration propre à chaque environnement sans reconstruire l'application.
+
+```json
+{
+  "apiBaseUrl": "http://localhost:8080",
+  "oidc": {
+    "authority": "http://localhost:30080/realms/kubecoder",
+    "clientId": "kubecoder-web",
+    "redirectUri": "http://localhost:5173/auth/callback",
+    "postLogoutRedirectUri": "http://localhost:5173/logout/callback"
+  }
+}
+```
+
+Toutes les propriétés sont obligatoires et les URL doivent être absolues. Le
+fichier est chargé avec `cache: no-store` avant l'initialisation OIDC ; une
+configuration absente ou invalide bloque volontairement le démarrage.
 
 L'interface est alors disponible sur `http://localhost:5173/admin`.
 
