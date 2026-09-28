@@ -737,7 +737,7 @@ components:
         offset: { type: integer }
     RepositoryInput:
       type: object
-      required: [name, provider, clone_url, default_branch, include_submodules]
+      required: [name, provider, clone_url, default_branch, include_submodules, secret_mode, secret_ids]
       properties:
         name: { type: string, maxLength: 120 }
         provider: { $ref: '#/components/schemas/GitProvider' }
@@ -745,12 +745,16 @@ components:
         default_branch: { type: string, maxLength: 255 }
         include_submodules: { type: boolean }
         agent_id: { type: string, format: uuid, nullable: true }
+        secret_mode: { type: string, enum: [ALL, SELECTED], default: ALL }
+        secret_ids:
+          type: array
+          items: { type: string, format: uuid }
       additionalProperties: false
     Repository:
       allOf:
         - { $ref: '#/components/schemas/RepositoryInput' }
         - type: object
-          required: [id, organization_id, agent, created_at, updated_at]
+          required: [id, organization_id, agent, secret_mode, secret_ids, created_at, updated_at]
           properties:
             id: { type: string, format: uuid }
             organization_id: { type: string, format: uuid }
@@ -790,7 +794,7 @@ components:
       type: object
       required: [target_type, target_id]
       properties:
-        target_type: { type: string, enum: [AGENT, REPOSITORY] }
+        target_type: { type: string, enum: [AGENT] }
         target_id: { type: string, format: uuid }
       additionalProperties: false
     SecretBinding:

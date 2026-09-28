@@ -2,6 +2,7 @@ import type { PublicAgent } from './agents'
 import type { Page } from './organizations'
 
 export type GitProvider = 'github' | 'gitlab' | 'bitbucket'
+export type RepositorySecretMode = 'ALL' | 'SELECTED'
 
 export interface Repository {
   id: string
@@ -11,6 +12,8 @@ export interface Repository {
   clone_url: string
   default_branch: string
   include_submodules: boolean
+  secret_mode: RepositorySecretMode
+  secret_ids: readonly string[]
   agent: PublicAgent | null
   created_at: string
   updated_at: string
@@ -23,6 +26,8 @@ export interface RepositoryInput {
   default_branch: string
   include_submodules: boolean
   agent_id: string | null
+  secret_mode: RepositorySecretMode
+  secret_ids: string[]
 }
 
 export interface RepositoryPageRequest {

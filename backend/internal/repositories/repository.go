@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/agents"
@@ -64,7 +65,7 @@ func (r *RepositoryStore) Get(ctx context.Context, organizationID, id uuid.UUID)
 }
 
 // Create persists a repository and its optional agent binding atomically.
-func (r *RepositoryStore) Create(ctx context.Context, row *Repository, agentID *uuid.UUID) error {
+func (r *RepositoryStore) Create(ctx context.Context, row *Repository, agentID *uuid.UUID, secretIDs []uuid.UUID) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(row).Error; err != nil {
 			if errors.Is(err, gorm.ErrDuplicatedKey) {
@@ -72,15 +73,18 @@ func (r *RepositoryStore) Create(ctx context.Context, row *Repository, agentID *
 			}
 			return err
 		}
-		return replaceBinding(tx, row.ID, agentID)
+		if err := replaceBinding(tx, row.ID, agentID); err != nil {
+			return err
+		}
+		return replaceSecretBindings(tx, row.OrganizationID, row.ID, row.SecretMode, secretIDs)
 	})
 }
 
 // Update changes a repository and its optional agent binding atomically.
-func (r *RepositoryStore) Update(ctx context.Context, row *Repository, agentID *uuid.UUID) error {
+func (r *RepositoryStore) Update(ctx context.Context, row *Repository, agentID *uuid.UUID, secretIDs []uuid.UUID) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		result := tx.Model(&Repository{}).Where("organization_id = ? AND id = ?", row.OrganizationID, row.ID).Updates(map[string]any{
-			"name": row.Name, "provider": row.Provider, "clone_url": row.CloneURL, "default_branch": row.DefaultBranch, "include_submodules": row.IncludeSubmodules,
+			"name": row.Name, "provider": row.Provider, "clone_url": row.CloneURL, "default_branch": row.DefaultBranch, "include_submodules": row.IncludeSubmodules, "secret_mode": row.SecretMode,
 		})
 		if errors.Is(result.Error, gorm.ErrDuplicatedKey) {
 			return ErrConflict
@@ -91,7 +95,10 @@ func (r *RepositoryStore) Update(ctx context.Context, row *Repository, agentID *
 		if result.RowsAffected == 0 {
 			return ErrNotFound
 		}
-		return replaceBinding(tx, row.ID, agentID)
+		if err := replaceBinding(tx, row.ID, agentID); err != nil {
+			return err
+		}
+		return replaceSecretBindings(tx, row.OrganizationID, row.ID, row.SecretMode, secretIDs)
 	})
 }
 
@@ -114,6 +121,20 @@ func (r *RepositoryStore) AgentAvailable(ctx context.Context, id uuid.UUID) (boo
 	return count == 1, err
 }
 
+// OrganizationSecretsExist verifies that every selected secret belongs to the tenant.
+func (r *RepositoryStore) OrganizationSecretsExist(ctx context.Context, organizationID uuid.UUID, ids []uuid.UUID) (bool, error) {
+	if len(ids) == 0 {
+		return true, nil
+	}
+	unique := make(map[uuid.UUID]struct{}, len(ids))
+	for _, id := range ids {
+		unique[id] = struct{}{}
+	}
+	var count int64
+	err := r.db.WithContext(ctx).Model(&models.Secret{}).Where("(scope = ?) OR (scope = ? AND organization_id = ?)", "PLATFORM", "ORGANIZATION", organizationID).Where("id IN ?", ids).Count(&count).Error
+	return count == int64(len(unique)), err
+}
+
 // replaceBinding upserts or removes the one-to-one agent assignment.
 func replaceBinding(tx *gorm.DB, repositoryID uuid.UUID, agentID *uuid.UUID) error {
 	if agentID == nil {
@@ -121,6 +142,26 @@ func replaceBinding(tx *gorm.DB, repositoryID uuid.UUID, agentID *uuid.UUID) err
 	}
 	binding := models.RepositoryAgentBinding{RepositoryID: repositoryID, AgentID: *agentID}
 	return tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "repository_id"}}, DoUpdates: clause.AssignmentColumns([]string{"agent_id", "updated_at"})}).Create(&binding).Error
+}
+
+// replaceSecretBindings materializes the repository secret policy atomically.
+func replaceSecretBindings(tx *gorm.DB, organizationID, repositoryID uuid.UUID, mode string, selectedIDs []uuid.UUID) error {
+	if err := tx.Where("repository_id = ?", repositoryID).Delete(&models.SecretBinding{}).Error; err != nil {
+		return err
+	}
+	secretIDs := selectedIDs
+	if mode == SecretModeAll {
+		if err := tx.Model(&models.Secret{}).Where("scope = ? OR (scope = ? AND organization_id = ?)", "PLATFORM", "ORGANIZATION", organizationID).Pluck("id", &secretIDs).Error; err != nil {
+			return err
+		}
+	}
+	for _, secretID := range secretIDs {
+		binding := models.SecretBinding{ID: uuid.New(), SecretID: secretID, TargetType: "REPOSITORY", RepositoryID: &repositoryID, CreatedAt: time.Now().UTC()}
+		if err := tx.Create(&binding).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // decorate adds public agent projections to repository rows.
@@ -140,12 +181,24 @@ func (r *RepositoryStore) decorate(ctx context.Context, rows []Repository, total
 	for _, binding := range bindings {
 		byRepository[binding.RepositoryID] = binding.Agent
 	}
+	secretBindings := make([]models.SecretBinding, 0)
+	if len(ids) > 0 {
+		if err := r.db.WithContext(ctx).Where("repository_id IN ?", ids).Order("created_at, id").Find(&secretBindings).Error; err != nil {
+			return nil, 0, err
+		}
+	}
+	secretIDsByRepository := make(map[uuid.UUID][]uuid.UUID, len(ids))
+	for _, binding := range secretBindings {
+		if binding.RepositoryID != nil {
+			secretIDsByRepository[*binding.RepositoryID] = append(secretIDsByRepository[*binding.RepositoryID], binding.SecretID)
+		}
+	}
 	for _, row := range rows {
 		var public *agents.PublicAgent
 		if agent, ok := byRepository[row.ID]; ok {
 			public = &agents.PublicAgent{ID: agent.ID.String(), Name: agent.Name, Description: agent.Description, Capabilities: agent.Capabilities, Active: agent.Active}
 		}
-		items = append(items, Item{ID: row.ID, OrganizationID: row.OrganizationID, Name: row.Name, Provider: row.Provider, CloneURL: row.CloneURL, DefaultBranch: row.DefaultBranch, IncludeSubmodules: row.IncludeSubmodules, Agent: public, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt})
+		items = append(items, Item{ID: row.ID, OrganizationID: row.OrganizationID, Name: row.Name, Provider: row.Provider, CloneURL: row.CloneURL, DefaultBranch: row.DefaultBranch, IncludeSubmodules: row.IncludeSubmodules, SecretMode: row.SecretMode, SecretIDs: secretIDsByRepository[row.ID], Agent: public, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt})
 	}
 	return items, total, nil
 }

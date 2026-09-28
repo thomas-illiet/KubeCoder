@@ -24,7 +24,7 @@ func testService(t *testing.T) (*Service, *gorm.DB, users.User) {
 		`CREATE TABLE organizations (id text PRIMARY KEY, name text, slug text, created_at datetime, updated_at datetime)`,
 		`CREATE TABLE organization_memberships (organization_id text, user_id text, created_at datetime, PRIMARY KEY (organization_id, user_id))`,
 		`CREATE TABLE agents (id text PRIMARY KEY, name text, active boolean)`,
-		`CREATE TABLE repositories (id text PRIMARY KEY, organization_id text, name text)`,
+		`CREATE TABLE repositories (id text PRIMARY KEY, organization_id text, name text, secret_mode text NOT NULL DEFAULT 'ALL')`,
 		`CREATE TABLE secrets (id text PRIMARY KEY, scope text, organization_id text, variable_name text UNIQUE, description text, encrypted_value blob, nonce blob, fingerprint text, encryption_version text, expires_at datetime, value_replaced_at datetime, created_at datetime, updated_at datetime)`,
 		`CREATE TABLE secret_bindings (id text PRIMARY KEY, secret_id text, target_type text, agent_id text, repository_id text, created_at datetime)`,
 	} {
@@ -221,5 +221,46 @@ func TestRepositoryScopeIsRejected(t *testing.T) {
 	_, err := service.CreateOrganization(context.Background(), actor, uuid.New(), Input{Scope: "REPOSITORY", VariableName: "REPOSITORY_TOKEN", Value: "protected"})
 	if err != ErrInvalid {
 		t.Fatalf("expected invalid scope, got %v", err)
+	}
+}
+
+// TestNewSecretsBindToAllModeRepositories verifies default repository inheritance.
+func TestNewSecretsBindToAllModeRepositories(t *testing.T) {
+	service, db, actor := testService(t)
+	organizationID, repositoryID := uuid.New(), uuid.New()
+	if err := db.Exec("INSERT INTO repositories (id, organization_id, name, secret_mode) VALUES (?, ?, ?, ?)", repositoryID, organizationID, "app", "ALL").Error; err != nil {
+		t.Fatal(err)
+	}
+	created, err := service.CreateOrganization(context.Background(), actor, organizationID, Input{Scope: ScopeOrganization, VariableName: "INHERITED_TOKEN", Value: "protected"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var count int64
+	if err := db.Model(&models.SecretBinding{}).Where("secret_id = ? AND repository_id = ?", created.ID, repositoryID).Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("binding count = %d, want 1", count)
+	}
+}
+
+// TestPlatformSecretsBindToEveryAllModeRepository verifies global default inheritance.
+func TestPlatformSecretsBindToEveryAllModeRepository(t *testing.T) {
+	service, db, actor := testService(t)
+	for _, organizationID := range []uuid.UUID{uuid.New(), uuid.New()} {
+		if err := db.Exec("INSERT INTO repositories (id, organization_id, name, secret_mode) VALUES (?, ?, ?, ?)", uuid.New(), organizationID, organizationID.String(), "ALL").Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	created, err := service.CreatePlatform(context.Background(), actor, Input{Scope: ScopePlatform, VariableName: "GLOBAL_INHERITED_TOKEN", Value: "protected"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var count int64
+	if err := db.Model(&models.SecretBinding{}).Where("secret_id = ? AND repository_id IS NOT NULL", created.ID).Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Fatalf("binding count = %d, want 2", count)
 	}
 }

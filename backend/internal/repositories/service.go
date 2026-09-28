@@ -47,11 +47,11 @@ func (s *Service) Create(ctx context.Context, actor users.User, slug string, inp
 	if err != nil {
 		return Item{}, err
 	}
-	row, agentID, err := s.validated(ctx, organization.ID, uuid.Nil, input)
+	row, agentID, secretIDs, err := s.validated(ctx, organization.ID, uuid.Nil, input)
 	if err != nil {
 		return Item{}, err
 	}
-	if err := s.repository.Create(ctx, &row, agentID); err != nil {
+	if err := s.repository.Create(ctx, &row, agentID, secretIDs); err != nil {
 		return Item{}, err
 	}
 	return s.repository.Get(ctx, organization.ID, row.ID)
@@ -63,11 +63,11 @@ func (s *Service) Update(ctx context.Context, actor users.User, slug string, id 
 	if err != nil {
 		return Item{}, err
 	}
-	row, agentID, err := s.validated(ctx, organization.ID, id, input)
+	row, agentID, secretIDs, err := s.validated(ctx, organization.ID, id, input)
 	if err != nil {
 		return Item{}, err
 	}
-	if err := s.repository.Update(ctx, &row, agentID); err != nil {
+	if err := s.repository.Update(ctx, &row, agentID, secretIDs); err != nil {
 		return Item{}, err
 	}
 	return s.repository.Get(ctx, organization.ID, id)
@@ -92,24 +92,51 @@ func (s *Service) organization(ctx context.Context, actor users.User, slug strin
 }
 
 // validated normalizes repository input and verifies the optional agent.
-func (s *Service) validated(ctx context.Context, organizationID, id uuid.UUID, input Input) (Repository, *uuid.UUID, error) {
+func (s *Service) validated(ctx context.Context, organizationID, id uuid.UUID, input Input) (Repository, *uuid.UUID, []uuid.UUID, error) {
 	input.Name = strings.TrimSpace(input.Name)
 	input.Provider = strings.ToLower(strings.TrimSpace(input.Provider))
 	input.DefaultBranch = strings.TrimSpace(input.DefaultBranch)
 	normalizedURL, err := normalizeCloneURL(input.CloneURL)
 	if err != nil || input.Name == "" || len(input.Name) > 120 || !validProvider(input.Provider) || input.DefaultBranch == "" || len(input.DefaultBranch) > 255 {
-		return Repository{}, nil, ErrInvalid
+		return Repository{}, nil, nil, ErrInvalid
 	}
 	if input.AgentID != nil {
 		available, err := s.repository.AgentAvailable(ctx, *input.AgentID)
 		if err != nil {
-			return Repository{}, nil, err
+			return Repository{}, nil, nil, err
 		}
 		if !available {
-			return Repository{}, nil, ErrAgent
+			return Repository{}, nil, nil, ErrAgent
 		}
 	}
-	return Repository{ID: id, OrganizationID: organizationID, Name: input.Name, Provider: input.Provider, CloneURL: normalizedURL, DefaultBranch: input.DefaultBranch, IncludeSubmodules: input.IncludeSubmodules}, input.AgentID, nil
+	if input.SecretMode == "" {
+		input.SecretMode = SecretModeAll
+	}
+	if input.SecretMode != SecretModeAll && input.SecretMode != SecretModeSelected {
+		return Repository{}, nil, nil, ErrInvalid
+	}
+	if input.SecretMode == SecretModeAll {
+		input.SecretIDs = nil
+	} else {
+		unique := make(map[uuid.UUID]struct{}, len(input.SecretIDs))
+		normalized := make([]uuid.UUID, 0, len(input.SecretIDs))
+		for _, secretID := range input.SecretIDs {
+			if _, exists := unique[secretID]; exists {
+				continue
+			}
+			unique[secretID] = struct{}{}
+			normalized = append(normalized, secretID)
+		}
+		input.SecretIDs = normalized
+		valid, err := s.repository.OrganizationSecretsExist(ctx, organizationID, input.SecretIDs)
+		if err != nil {
+			return Repository{}, nil, nil, err
+		}
+		if !valid {
+			return Repository{}, nil, nil, ErrInvalid
+		}
+	}
+	return Repository{ID: id, OrganizationID: organizationID, Name: input.Name, Provider: input.Provider, CloneURL: normalizedURL, DefaultBranch: input.DefaultBranch, IncludeSubmodules: input.IncludeSubmodules, SecretMode: input.SecretMode}, input.AgentID, input.SecretIDs, nil
 }
 
 // normalizeCloneURL validates and canonicalizes supported Git URLs.

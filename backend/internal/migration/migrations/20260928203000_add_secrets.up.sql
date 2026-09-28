@@ -1,3 +1,6 @@
+ALTER TABLE "repositories" ADD COLUMN "secret_mode" text NOT NULL DEFAULT 'ALL';
+ALTER TABLE "repositories" ADD CONSTRAINT "repositories_secret_mode_check" CHECK (secret_mode IN ('ALL', 'SELECTED'));
+
 CREATE TABLE "secrets" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid(),
   "scope" text NOT NULL,
@@ -64,3 +67,11 @@ CREATE UNIQUE INDEX "secret_bindings_repository_key" ON "secret_bindings" ("secr
 CREATE INDEX "idx_secret_bindings_secret_id" ON "secret_bindings" ("secret_id");
 CREATE INDEX "idx_secret_bindings_agent_id" ON "secret_bindings" ("agent_id");
 CREATE INDEX "idx_secret_bindings_repository_id" ON "secret_bindings" ("repository_id");
+
+INSERT INTO "secret_bindings" ("id", "secret_id", "target_type", "repository_id", "created_at")
+SELECT gen_random_uuid(), secrets.id, 'REPOSITORY', repositories.id, now()
+FROM secrets
+CROSS JOIN repositories
+WHERE repositories.secret_mode = 'ALL'
+  AND (secrets.scope = 'PLATFORM' OR (secrets.scope = 'ORGANIZATION' AND repositories.organization_id = secrets.organization_id))
+ON CONFLICT DO NOTHING;

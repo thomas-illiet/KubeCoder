@@ -86,6 +86,7 @@ type Repository struct {
 	CloneURL          string       `gorm:"not null;uniqueIndex:repositories_organization_clone_url_key" json:"clone_url"`
 	DefaultBranch     string       `gorm:"not null" json:"default_branch"`
 	IncludeSubmodules bool         `gorm:"not null;default:false" json:"include_submodules"`
+	SecretMode        string       `gorm:"not null;default:'ALL'" json:"secret_mode"`
 	CreatedAt         time.Time    `gorm:"not null" json:"created_at"`
 	UpdatedAt         time.Time    `gorm:"not null" json:"updated_at"`
 }

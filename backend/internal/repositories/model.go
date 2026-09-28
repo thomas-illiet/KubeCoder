@@ -12,6 +12,11 @@ import (
 
 type Repository = models.Repository
 
+const (
+	SecretModeAll      = "ALL"
+	SecretModeSelected = "SELECTED"
+)
+
 type Item struct {
 	ID                uuid.UUID           `json:"id"`
 	OrganizationID    uuid.UUID           `json:"organization_id"`
@@ -20,18 +25,22 @@ type Item struct {
 	CloneURL          string              `json:"clone_url"`
 	DefaultBranch     string              `json:"default_branch"`
 	IncludeSubmodules bool                `json:"include_submodules"`
+	SecretMode        string              `json:"secret_mode"`
+	SecretIDs         []uuid.UUID         `json:"secret_ids"`
 	Agent             *agents.PublicAgent `json:"agent"`
 	CreatedAt         time.Time           `json:"created_at"`
 	UpdatedAt         time.Time           `json:"updated_at"`
 }
 
 type Input struct {
-	Name              string     `json:"name"`
-	Provider          string     `json:"provider"`
-	CloneURL          string     `json:"clone_url"`
-	DefaultBranch     string     `json:"default_branch"`
-	IncludeSubmodules bool       `json:"include_submodules"`
-	AgentID           *uuid.UUID `json:"agent_id"`
+	Name              string      `json:"name"`
+	Provider          string      `json:"provider"`
+	CloneURL          string      `json:"clone_url"`
+	DefaultBranch     string      `json:"default_branch"`
+	IncludeSubmodules bool        `json:"include_submodules"`
+	AgentID           *uuid.UUID  `json:"agent_id"`
+	SecretMode        string      `json:"secret_mode"`
+	SecretIDs         []uuid.UUID `json:"secret_ids"`
 }
 
 var (

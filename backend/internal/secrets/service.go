@@ -158,8 +158,7 @@ func (s *Service) AddBinding(ctx context.Context, actor users.User, id uuid.UUID
 	if err := s.authorizeMutation(ctx, actor, organizationID); err != nil {
 		return BindingView{}, err
 	}
-	item, err := s.repository.Get(ctx, id, organizationID)
-	if err != nil {
+	if _, err := s.repository.Get(ctx, id, organizationID); err != nil {
 		return BindingView{}, err
 	}
 	binding := Binding{ID: uuid.New(), SecretID: id, TargetType: input.TargetType, CreatedAt: s.now().UTC()}
@@ -174,17 +173,7 @@ func (s *Service) AddBinding(ctx context.Context, actor users.User, id uuid.UUID
 		}
 		binding.AgentID = &input.TargetID
 	case TargetRepository:
-		if item.Scope == ScopePlatform || item.OrganizationID == nil {
-			return BindingView{}, ErrInvalid
-		}
-		belongs, err := s.repository.RepositoryBelongs(ctx, input.TargetID, *item.OrganizationID)
-		if err != nil {
-			return BindingView{}, err
-		}
-		if !belongs {
-			return BindingView{}, ErrInvalid
-		}
-		binding.RepositoryID = &input.TargetID
+		return BindingView{}, ErrInvalid
 	default:
 		return BindingView{}, ErrInvalid
 	}
@@ -210,6 +199,13 @@ func (s *Service) RemoveBinding(ctx context.Context, actor users.User, id, bindi
 	}
 	if _, err := s.repository.Get(ctx, id, organizationID); err != nil {
 		return err
+	}
+	binding, err := s.repository.Binding(ctx, id, bindingID)
+	if err != nil {
+		return err
+	}
+	if binding.TargetType == TargetRepository {
+		return ErrInvalid
 	}
 	return s.repository.RemoveBinding(ctx, id, bindingID)
 }

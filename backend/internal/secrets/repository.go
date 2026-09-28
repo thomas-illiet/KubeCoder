@@ -98,7 +98,27 @@ func (r *Repository) Get(ctx context.Context, id uuid.UUID, organizationID *uuid
 
 // Create stores a secret.
 func (r *Repository) Create(ctx context.Context, secret *Secret) error {
-	err := r.db.WithContext(ctx).Create(secret).Error
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(secret).Error; err != nil {
+			return err
+		}
+		repositories := make([]models.Repository, 0)
+		statement := tx.Where("secret_mode = ?", "ALL")
+		if secret.OrganizationID != nil {
+			statement = statement.Where("organization_id = ?", *secret.OrganizationID)
+		}
+		if err := statement.Find(&repositories).Error; err != nil {
+			return err
+		}
+		for _, repository := range repositories {
+			repositoryID := repository.ID
+			binding := Binding{ID: uuid.New(), SecretID: secret.ID, TargetType: TargetRepository, RepositoryID: &repositoryID, CreatedAt: secret.CreatedAt}
+			if err := tx.Create(&binding).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 	if errors.Is(err, gorm.ErrDuplicatedKey) {
 		return ErrConflict
 	}
@@ -136,6 +156,16 @@ func (r *Repository) Bindings(ctx context.Context, secretID uuid.UUID) ([]Bindin
 	items := make([]Binding, 0)
 	err := r.db.WithContext(ctx).Preload("Agent").Preload("Repository").Where("secret_id = ?", secretID).Order("created_at, id").Find(&items).Error
 	return items, err
+}
+
+// Binding returns one binding constrained to its parent secret.
+func (r *Repository) Binding(ctx context.Context, secretID, bindingID uuid.UUID) (Binding, error) {
+	var item Binding
+	err := r.db.WithContext(ctx).Where("id = ? AND secret_id = ?", bindingID, secretID).First(&item).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return Binding{}, ErrNotFound
+	}
+	return item, err
 }
 
 // BindingsBySecretIDs loads all bindings for one result page in a bounded query set.
@@ -198,15 +228,6 @@ func (r *Repository) Targets(ctx context.Context, organizationID *uuid.UUID) ([]
 	result := make([]Target, 0, len(agents))
 	for _, agent := range agents {
 		result = append(result, Target{ID: agent.ID, Type: TargetAgent, Name: agent.Name})
-	}
-	if organizationID != nil {
-		repositories := make([]models.Repository, 0)
-		if err := r.db.WithContext(ctx).Where("organization_id = ?", *organizationID).Order("name, id").Find(&repositories).Error; err != nil {
-			return nil, err
-		}
-		for _, repository := range repositories {
-			result = append(result, Target{ID: repository.ID, Type: TargetRepository, Name: repository.Name})
-		}
 	}
 	return result, nil
 }
