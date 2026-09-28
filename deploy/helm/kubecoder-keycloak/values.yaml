@@ -43,6 +43,7 @@ realm:
   name: kubecoder
   displayName: KubeCoder
   clientId: kubecoder-web
+  apiAudience: kubecoder-api
   applicationUrl: http://localhost:5173
   demoUser:
     username: admin

@@ -1,0 +1,42 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "kubecoder.fullname" . }}-migrate-{{ .Release.Revision }}
+  labels:
+    {{- include "kubecoder.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migration
+spec:
+  backoffLimit: {{ .Values.migration.backoffLimit }}
+  ttlSecondsAfterFinished: {{ .Values.migration.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "kubecoder.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: migration
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: migrate
+          image: {{ include "kubecoder.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["migrate", "up"]
+          envFrom:
+            - configMapRef: { name: {{ include "kubecoder.fullname" . }} }
+          env:
+            - name: KUBECODER_DATABASE_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kubecoder.databaseSecretName" . }}
+                  key: {{ ternary .Values.postgresql.auth.dsnKey .Values.externalDatabase.dsnSecretKey .Values.postgresql.enabled }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+            readOnlyRootFilesystem: true
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { cpu: 200m, memory: 128Mi }

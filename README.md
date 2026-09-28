@@ -28,3 +28,7 @@ npm run build
 ```
 
 Les identifiants présents dans le chart et l’exposition HTTP sont strictement réservés au développement local Docker Desktop.
+
+## Backend Go
+
+Le backend Go, son endpoint utilisateur OIDC et son chart PostgreSQL se trouvent dans [`backend`](./backend) et [`deploy/helm/kubecoder`](./deploy/helm/kubecoder). Le guide du chart décrit le build de l'image locale et l'installation dans Kubernetes.

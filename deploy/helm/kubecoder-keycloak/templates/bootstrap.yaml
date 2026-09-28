@@ -48,6 +48,28 @@ data:
       "$KCADM" create clients -r "$REALM" --config /tmp/kcadm.config -f "$CLIENT_PAYLOAD"
     fi
 
+    AUDIENCE_MAPPER_PAYLOAD="$(mktemp)"
+    cat >"$AUDIENCE_MAPPER_PAYLOAD" <<EOF
+    {
+      "id": "kubecoder-api-audience",
+      "name": "KubeCoder API audience",
+      "protocol": "openid-connect",
+      "protocolMapper": "oidc-audience-mapper",
+      "config": {
+        "included.custom.audience": "$API_AUDIENCE",
+        "access.token.claim": "true",
+        "id.token.claim": "false",
+        "lightweight.claim": "false",
+        "introspection.token.claim": "true"
+      }
+    }
+    EOF
+    if "$KCADM" get "clients/kubecoder-web/protocol-mappers/models/kubecoder-api-audience" -r "$REALM" --config /tmp/kcadm.config >/dev/null 2>&1; then
+      "$KCADM" update "clients/kubecoder-web/protocol-mappers/models/kubecoder-api-audience" -r "$REALM" --config /tmp/kcadm.config -f "$AUDIENCE_MAPPER_PAYLOAD"
+    else
+      "$KCADM" create "clients/kubecoder-web/protocol-mappers/models" -r "$REALM" --config /tmp/kcadm.config -f "$AUDIENCE_MAPPER_PAYLOAD"
+    fi
+
     USER_PAYLOAD="$(mktemp)"
     cat >"$USER_PAYLOAD" <<EOF
     {
@@ -126,6 +148,8 @@ spec:
               value: {{ .Values.realm.clientId | quote }}
             - name: APPLICATION_URL
               value: {{ .Values.realm.applicationUrl | quote }}
+            - name: API_AUDIENCE
+              value: {{ required "realm.apiAudience is required" .Values.realm.apiAudience | quote }}
             - name: DEMO_USERNAME
               valueFrom:
                 secretKeyRef:

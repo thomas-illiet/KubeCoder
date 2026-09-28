@@ -1,0 +1,12 @@
+KubeCoder has been installed in namespace {{ .Release.Namespace }}.
+
+API and Swagger UI:
+{{- if eq .Values.service.type "NodePort" }}
+  http://localhost:{{ .Values.service.nodePort }}/docs/
+{{- else }}
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "kubecoder.fullname" . }} 8080:{{ .Values.service.port }}
+  http://localhost:8080/docs/
+{{- end }}
+
+Inspect the rollout:
+  kubectl get pods,jobs,pvc,svc -n {{ .Release.Namespace }}

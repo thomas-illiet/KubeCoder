@@ -1,0 +1,6 @@
+postgresql:
+  enabled: false
+
+externalDatabase:
+  dsnSecretName: kubecoder-external-database
+  dsnSecretKey: dsn

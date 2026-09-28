@@ -16,6 +16,8 @@ helm upgrade --install kubecoder-auth ./deploy/helm/kubecoder-keycloak \
 
 The idempotent Helm hook provisions realm `kubecoder`, public client `kubecoder-web`, and the demo account:
 
+Access tokens issued to `kubecoder-web` include the `kubecoder-api` audience required by the local backend.
+
 - user: `admin`
 - password: `admin`
 

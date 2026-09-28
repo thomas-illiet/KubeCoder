@@ -1,0 +1,82 @@
+image:
+  repository: kubecoder
+  tag: dev
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+service:
+  type: NodePort
+  port: 8080
+  nodePort: 30081
+
+oidc:
+  issuer: http://localhost:30080/realms/kubecoder
+  discoveryURL: http://kubecoder-auth-kubecoder-keycloak.kubecoder-auth.svc.cluster.local:8080/realms/kubecoder
+  audience: kubecoder-api
+
+http:
+  readTimeout: 10s
+  writeTimeout: 15s
+  idleTimeout: 60s
+  shutdownTimeout: 15s
+  allowedOrigins:
+    - http://localhost:5173
+
+log:
+  level: info
+  format: json
+
+database:
+  maxOpenConns: 20
+  maxIdleConns: 5
+  connMaxLifetime: 30m
+
+postgresql:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "17.6-alpine"
+    pullPolicy: IfNotPresent
+  auth:
+    existingSecret: ""
+    dsnKey: dsn
+    usernameKey: username
+    passwordKey: password
+    databaseKey: database
+    username: kubecoder
+    password: kubecoder-local-only
+    database: kubecoder
+  storage:
+    size: 5Gi
+    storageClassName: hostpath
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+externalDatabase:
+  dsnSecretName: ""
+  dsnSecretKey: dsn
+
+migration:
+  expectedVersion: 1
+  waitTimeout: 5m
+  ttlSecondsAfterFinished: 600
+  backoffLimit: 3
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

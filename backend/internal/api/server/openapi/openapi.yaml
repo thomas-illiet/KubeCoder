@@ -1,0 +1,79 @@
+openapi: 3.0.3
+info:
+  title: KubeCoder API
+  version: 0.1.0
+  description: KubeCoder control-plane API.
+servers:
+  - url: /
+paths:
+  /api/v1/users/me:
+    get:
+      operationId: getCurrentUser
+      summary: Return the authenticated application user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /healthz:
+    get:
+      operationId: health
+      responses:
+        '200':
+          description: Process is alive
+  /readyz:
+    get:
+      operationId: readiness
+      responses:
+        '200':
+          description: API is ready
+        '503':
+          description: API is not ready
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    User:
+      type: object
+      required: [id, subject, username, display_name, email, is_admin, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        subject: { type: string }
+        username: { type: string }
+        display_name: { type: string }
+        email: { type: string, format: email }
+        is_admin: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    Problem:
+      type: object
+      required: [type, title, status, detail, instance, correlation_id]
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        correlation_id: { type: string, format: uuid }
+  responses:
+    Unauthorized:
+      description: Authentication required or invalid
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    InternalError:
+      description: Internal server error
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
