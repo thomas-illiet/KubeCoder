@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { onMounted, shallowRef } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 
-const { logout } = useAuth()
+const router = useRouter()
+const { completeLogin } = useAuth()
 const error = shallowRef('')
 
 onMounted(async () => {
   try {
-    await logout()
+    const returnTo = await completeLogin()
+    await router.replace(returnTo)
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : 'The OpenID Connect logout could not be started.'
+    error.value = cause instanceof Error ? cause.message : 'The OpenID Connect callback could not be completed.'
   }
 })
 </script>
@@ -18,11 +21,12 @@ onMounted(async () => {
   <v-card class="auth-card auth-card--compact">
     <div class="auth-card__header">
       <div class="auth-icon"><v-progress-circular v-if="!error" indeterminate color="primary" size="26" /><v-icon v-else icon="mdi-alert-circle-outline" color="error" size="26" /></div>
-      <h1>{{ error ? 'Sign-out failed' : 'Signing out' }}</h1>
-      <p>{{ error || 'Redirecting to the OpenID Connect provider…' }}</p>
+      <h1>{{ error ? 'Sign-in failed' : 'Completing sign-in' }}</h1>
+      <p>{{ error || 'Validating the OpenID Connect response…' }}</p>
     </div>
     <div v-if="error" class="auth-card__body">
-      <v-btn block color="primary" size="large" prepend-icon="mdi-login" to="/login">Back to sign in</v-btn>
+      <v-btn block color="primary" to="/login">Back to sign in</v-btn>
     </div>
   </v-card>
 </template>
+

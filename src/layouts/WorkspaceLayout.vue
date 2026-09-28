@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useDisplay } from 'vuetify'
 import { useRoute, useRouter } from 'vue-router'
 import { useNotifications } from '../composables/useNotifications'
+import { useAuth } from '../composables/useAuth'
 
 type LayoutMode = 'organization' | 'admin'
 type NavigationItem = { title: string; icon: string; to: string }
@@ -13,6 +14,7 @@ const { smAndDown: mobile } = useDisplay()
 const route = useRoute()
 const router = useRouter()
 const { success } = useNotifications()
+const { displayName, username, initials } = useAuth()
 const drawer = ref(!mobile.value)
 const rail = ref(false)
 const commandOpen = ref(false)
@@ -207,7 +209,7 @@ function resetCommandSearch() {
       <v-spacer />
       <v-btn class="search-trigger d-none d-md-flex" variant="outlined" color="default" @click="commandOpen = true"><v-icon icon="mdi-magnify" size="20" class="mr-2" />Search<span class="shortcut ml-8">⌘ K</span></v-btn>
       <v-btn icon="mdi-magnify" variant="text" class="d-md-none" aria-label="Search" @click="commandOpen = true" />
-      <v-menu><template #activator="{ props: menuProps }"><v-btn v-bind="menuProps" icon class="ml-1 user-avatar" aria-label="Profile menu">AM</v-btn></template><v-list width="230" class="pa-2"><v-list-item title="Alex Martin" subtitle="Platform admin" /><v-divider class="my-2" /><v-list-item title="Profile" prepend-icon="mdi-account-circle-outline" @click="router.push(profileTarget)" /><v-list-item title="Sign out" prepend-icon="mdi-logout" @click="router.push('/logout')" /></v-list></v-menu>
+      <v-menu><template #activator="{ props: menuProps }"><v-btn v-bind="menuProps" icon class="ml-1 user-avatar" aria-label="Profile menu">{{ initials }}</v-btn></template><v-list width="230" class="pa-2"><v-list-item :title="displayName" :subtitle="username || 'OpenID Connect user'" /><v-divider class="my-2" /><v-list-item title="Profile" prepend-icon="mdi-account-circle-outline" @click="router.push(profileTarget)" /><v-list-item title="Sign out" prepend-icon="mdi-logout" @click="router.push('/logout')" /></v-list></v-menu>
     </v-app-bar>
 
     <v-main>

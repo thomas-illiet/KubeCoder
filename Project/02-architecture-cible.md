@@ -12,6 +12,10 @@ Ces choix permettent de produire un premier incrément cohérent ; ils restent �
 - **Identité** : backend OIDC Relying Party/BFF, session opaque en cookie.
 - **Secrets** : interface de coffre abstraite ; implémentation initiale à décider entre Vault/KMS et chiffrement applicatif par enveloppe.
 
+### Authentification du prototype local
+
+Dans l'attente du BFF Go, le prototype Vue utilise directement un client OIDC public générique en Authorization Code avec PKCE S256 contre Keycloak local. Les tokens sont limités à `sessionStorage`, toutes les routes métier exigent une session et aucun rôle ou claim d'autorisation n'est interprété. Cette intégration de développement, sans `keycloak-js`, ne remplace pas la cible BFF avec cookie opaque avant mise en production.
+
 ## Composants
 
 ```mermaid
@@ -89,4 +93,3 @@ Le bridge ne reçoit qu'un jeton de run à durée courte, lié au `run_id`, à l
 - WebSocket partout : inutile si SSE + commandes HTTP couvre le moteur retenu.
 - Kafka : non justifié avant mesure de charge et exigence de rétention de flux indépendante.
 - Base vectorielle : hors périmètre tant qu'aucun cas de recherche sémantique n'est défini.
-

@@ -1,0 +1,153 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kubecoder-keycloak.fullname" . }}-bootstrap
+  labels:
+    {{- include "kubecoder-keycloak.labels" . | nindent 4 }}
+data:
+  bootstrap.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    KCADM=/opt/keycloak/bin/kcadm.sh
+    until "$KCADM" config credentials --config /tmp/kcadm.config --server "$KEYCLOAK_URL" --realm master --user "$ADMIN_USERNAME" --password "$ADMIN_PASSWORD"; do
+      echo "Waiting for Keycloak..."
+      sleep 5
+    done
+
+    if "$KCADM" get "realms/$REALM" --config /tmp/kcadm.config >/dev/null 2>&1; then
+      "$KCADM" update "realms/$REALM" --config /tmp/kcadm.config -s enabled=true -s "displayName=$REALM_DISPLAY_NAME"
+    else
+      "$KCADM" create realms --config /tmp/kcadm.config -s "realm=$REALM" -s enabled=true -s "displayName=$REALM_DISPLAY_NAME"
+    fi
+
+    CLIENT_PAYLOAD="$(mktemp)"
+    cat >"$CLIENT_PAYLOAD" <<EOF
+    {
+      "id": "kubecoder-web",
+      "clientId": "$CLIENT_ID",
+      "name": "KubeCoder Web",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["$APPLICATION_URL/*"],
+      "webOrigins": ["$APPLICATION_URL"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "$APPLICATION_URL/*"
+      }
+    }
+    EOF
+    if "$KCADM" get "clients/kubecoder-web" -r "$REALM" --config /tmp/kcadm.config >/dev/null 2>&1; then
+      "$KCADM" update "clients/kubecoder-web" -r "$REALM" --config /tmp/kcadm.config -f "$CLIENT_PAYLOAD"
+    else
+      "$KCADM" create clients -r "$REALM" --config /tmp/kcadm.config -f "$CLIENT_PAYLOAD"
+    fi
+
+    USER_PAYLOAD="$(mktemp)"
+    cat >"$USER_PAYLOAD" <<EOF
+    {
+      "username": "$DEMO_USERNAME",
+      "email": "$DEMO_EMAIL",
+      "firstName": "$DEMO_FIRST_NAME",
+      "lastName": "$DEMO_LAST_NAME",
+      "enabled": true,
+      "emailVerified": true
+    }
+    EOF
+    USER_ID="$("$KCADM" get users -r "$REALM" --config /tmp/kcadm.config -q exact=true -q "username=$DEMO_USERNAME" -F id --format csv --noquotes | tail -n 1 | tr -d '\r')"
+    if [ -z "$USER_ID" ]; then
+      "$KCADM" create users -r "$REALM" --config /tmp/kcadm.config -f "$USER_PAYLOAD"
+      USER_ID="$("$KCADM" get users -r "$REALM" --config /tmp/kcadm.config -q exact=true -q "username=$DEMO_USERNAME" -F id --format csv --noquotes | tail -n 1 | tr -d '\r')"
+    else
+      "$KCADM" update "users/$USER_ID" -r "$REALM" --config /tmp/kcadm.config -f "$USER_PAYLOAD"
+    fi
+    test -n "$USER_ID"
+    "$KCADM" set-password -r "$REALM" --config /tmp/kcadm.config --userid "$USER_ID" --new-password "$DEMO_PASSWORD"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "kubecoder-keycloak.fullname" . }}-bootstrap-{{ .Release.Revision }}
+  labels:
+    {{- include "kubecoder-keycloak.labels" . | nindent 4 }}
+    app.kubernetes.io/component: bootstrap
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded,hook-failed
+    helm.sh/hook-weight: "10"
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        {{- include "kubecoder-keycloak.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: bootstrap
+    spec:
+      restartPolicy: Never
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: bootstrap
+          image: "{{ .Values.keycloak.image.repository }}:{{ .Values.keycloak.image.tag }}"
+          imagePullPolicy: {{ .Values.keycloak.image.pullPolicy }}
+          command: ["/bin/bash", "/bootstrap/bootstrap.sh"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          env:
+            - name: KEYCLOAK_URL
+              value: "http://{{ include "kubecoder-keycloak.fullname" . }}:8080"
+            - name: ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kubecoder-keycloak.fullname" . }}
+                  key: admin-username
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kubecoder-keycloak.fullname" . }}
+                  key: admin-password
+            - name: REALM
+              value: {{ .Values.realm.name | quote }}
+            - name: REALM_DISPLAY_NAME
+              value: {{ .Values.realm.displayName | quote }}
+            - name: CLIENT_ID
+              value: {{ .Values.realm.clientId | quote }}
+            - name: APPLICATION_URL
+              value: {{ .Values.realm.applicationUrl | quote }}
+            - name: DEMO_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kubecoder-keycloak.fullname" . }}
+                  key: demo-username
+            - name: DEMO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kubecoder-keycloak.fullname" . }}
+                  key: demo-password
+            - name: DEMO_EMAIL
+              value: {{ .Values.realm.demoUser.email | quote }}
+            - name: DEMO_FIRST_NAME
+              value: {{ .Values.realm.demoUser.firstName | quote }}
+            - name: DEMO_LAST_NAME
+              value: {{ .Values.realm.demoUser.lastName | quote }}
+          volumeMounts:
+            - name: bootstrap
+              mountPath: /bootstrap
+              readOnly: true
+      volumes:
+        - name: bootstrap
+          configMap:
+            name: {{ include "kubecoder-keycloak.fullname" . }}-bootstrap
+            defaultMode: 0555

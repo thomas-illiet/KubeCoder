@@ -2,9 +2,11 @@
 import { ref } from 'vue'
 import SectionCard from '../components/SectionCard.vue'
 import StatusChip from '../components/StatusChip.vue'
+import { useAuth } from '../composables/useAuth'
 import { useNotifications } from '../composables/useNotifications'
 
-const displayName = ref('Alex Martin')
+const { displayName: oidcDisplayName, email, username, initials, profile } = useAuth()
+const displayName = ref(oidcDisplayName.value)
 const jobTitle = ref('Platform administrator')
 const timezone = ref('Europe/Paris')
 const { success } = useNotifications()
@@ -14,21 +16,21 @@ const { success } = useNotifications()
   <div class="profile-grid">
     <SectionCard title="Account" subtitle="Identity provided by your authentication provider">
       <div class="profile-summary">
-        <div class="profile-avatar">AM</div>
-        <div><h2>Alex Martin</h2><p>alex.martin@example.test</p><StatusChip label="Active account" color="success" icon="mdi-check-circle-outline" /></div>
+        <div class="profile-avatar">{{ initials }}</div>
+        <div><h2>{{ oidcDisplayName }}</h2><p>{{ email || username }}</p><StatusChip label="Active account" color="success" icon="mdi-check-circle-outline" /></div>
       </div>
       <v-divider />
       <div class="pa-5">
         <div class="profile-detail"><span>Authentication</span><strong>OpenID Connect</strong></div>
-        <div class="profile-detail"><span>Account ID</span><code>usr_alex_martin</code></div>
-        <div class="profile-detail"><span>Last sign-in</span><strong>Today at 09:42</strong></div>
+        <div class="profile-detail"><span>Account ID</span><code>{{ profile?.sub }}</code></div>
+        <div class="profile-detail"><span>Username</span><strong>{{ username }}</strong></div>
       </div>
     </SectionCard>
 
     <SectionCard title="Personal information" subtitle="Basic preferences used across workspaces">
       <div class="pa-5">
         <v-text-field v-model="displayName" label="Display name" />
-        <v-text-field label="Email address" model-value="alex.martin@example.test" readonly hint="Managed by your identity provider" persistent-hint />
+        <v-text-field label="Email address" :model-value="email" readonly hint="Managed by your identity provider" persistent-hint />
         <v-text-field v-model="jobTitle" label="Job title" />
         <IconSelect v-model="timezone" label="Timezone" :items="['Europe/Paris', 'Europe/London', 'America/New_York', 'Asia/Tokyo']" />
       </div>

@@ -1,0 +1,16 @@
+Keycloak is available at:
+  {{ .Values.keycloak.hostname }}
+
+Realm: {{ .Values.realm.name }}
+OIDC issuer: {{ .Values.keycloak.hostname }}/realms/{{ .Values.realm.name }}
+Client: {{ .Values.realm.clientId }}
+
+Local development credentials (do not use in shared environments):
+  Demo user: {{ .Values.realm.demoUser.username }} / {{ .Values.realm.demoUser.password }}
+  Admin: {{ .Values.keycloak.admin.username }} / {{ .Values.keycloak.admin.password }}
+
+Frontend configuration:
+  VITE_OIDC_AUTHORITY={{ .Values.keycloak.hostname }}/realms/{{ .Values.realm.name }}
+  VITE_OIDC_CLIENT_ID={{ .Values.realm.clientId }}
+  VITE_OIDC_REDIRECT_URI={{ .Values.realm.applicationUrl }}/auth/callback
+

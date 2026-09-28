@@ -1,0 +1,52 @@
+keycloak:
+  image:
+    repository: quay.io/keycloak/keycloak
+    tag: "26.7.4"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  hostname: http://localhost:30080
+  service:
+    nodePort: 30080
+  admin:
+    username: admin
+    # Local development only. Override for any shared environment.
+    password: admin
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+postgresql:
+  image:
+    repository: postgres
+    tag: "17.6-alpine"
+    pullPolicy: IfNotPresent
+  database: keycloak
+  username: keycloak
+  # Local development only. Override for any shared environment.
+  password: kubecoder-postgres
+  storage:
+    size: 2Gi
+    storageClassName: hostpath
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+realm:
+  name: kubecoder
+  displayName: KubeCoder
+  clientId: kubecoder-web
+  applicationUrl: http://localhost:5173
+  demoUser:
+    username: admin
+    password: admin
+    email: admin@kubecoder.local
+    firstName: Demo
+    lastName: Admin

@@ -29,6 +29,7 @@ Ce fichier sert de registre léger. Une décision structurante acceptée pourra 
 | D-023 | Test des serveurs MCP | Accepté | Chaque test lance un conteneur Docker éphémère dédié depuis un worker isolé, exécute handshake et `tools/list`, puis garantit le nettoyage | L'API n'accède pas à la socket Docker ; réseau, ressources, durée, logs et secrets sont strictement bornés |
 | D-024 | Gestion des secrets d'organisation | Accepté | Le layout organisation expose aux `OWNER` et `ADMIN` la liste, la création et la rotation des secrets organisation/repository, toujours en écriture seule | Les secrets globaux de plateforme sont absents des API et vues organisation ; les membres standard n'y accèdent pas et l'administration globale ne voit jamais les valeurs tenant |
 | D-025 | Accès Git global | Accepté | L'accès Git utilise une clé publique unique configurée globalement dans le backend ; aucun credential Git n'est géré depuis la page Secrets | La page d'administration Secrets ne liste et ne crée que des secrets applicatifs ; la configuration de la clé Git reste hors de l'interface |
+| D-026 | Authentification du prototype local | Accepté | Le prototype Vue utilise temporairement un client OIDC public générique, Authorization Code + PKCE S256 et des tokens en `sessionStorage`, contre Keycloak local ; aucun adaptateur `keycloak-js` ni rôle applicatif | Toutes les routes métier exigent une session. Le BFF Go et son cookie opaque restent l'architecture cible avant toute mise en production |
 
 ## Modèle d'une décision
 
@@ -43,4 +44,3 @@ Ce fichier sert de registre léger. Une décision structurante acceptée pourra 
 - Conséquences : effets positifs, coûts et risques
 - Validation : preuve ou test attendu
 ```
-
