@@ -11,6 +11,33 @@ import (
 
 var slugPattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 
+// OrganizationOrder identifies the supported administration list sort columns.
+type OrganizationOrder string
+
+const (
+	OrganizationOrderName        OrganizationOrder = "name"
+	OrganizationOrderCreatedAt   OrganizationOrder = "created_at"
+	OrganizationOrderMemberCount OrganizationOrder = "member_count"
+)
+
+// MemberOrder identifies the supported organization member sort columns.
+type MemberOrder string
+
+const (
+	MemberOrderDisplayName MemberOrder = "display_name"
+	MemberOrderUsername    MemberOrder = "username"
+	MemberOrderEmail       MemberOrder = "email"
+	MemberOrderJoinedAt    MemberOrder = "joined_at"
+)
+
+// OrderDirection identifies the supported list sort directions.
+type OrderDirection string
+
+const (
+	OrderAscending  OrderDirection = "asc"
+	OrderDescending OrderDirection = "desc"
+)
+
 // Service implements organization access and administration rules.
 type Service struct{ repository *Repository }
 
@@ -33,11 +60,18 @@ func (s *Service) SetPreferred(ctx context.Context, actor users.User, slug strin
 }
 
 // List returns all organizations for a platform administrator.
-func (s *Service) List(ctx context.Context, actor users.User, query string, limit, offset int) ([]OrganizationSummary, int64, error) {
+func (s *Service) List(ctx context.Context, actor users.User, query string, limit, offset int, orderBy, orderDirection string) ([]OrganizationSummary, int64, error) {
 	if !actor.IsAdmin {
 		return nil, 0, ErrForbidden
 	}
-	return s.repository.List(ctx, strings.TrimSpace(query), normalizeLimit(limit), max(offset, 0))
+	return s.repository.List(
+		ctx,
+		strings.TrimSpace(query),
+		normalizeLimit(limit),
+		max(offset, 0),
+		normalizeOrganizationOrder(orderBy),
+		normalizeOrderDirection(orderDirection),
+	)
 }
 
 // Create validates and creates an organization for a platform administrator.
@@ -85,14 +119,22 @@ func (s *Service) Delete(ctx context.Context, actor users.User, id uuid.UUID) er
 }
 
 // ListMembers returns organization members for a platform administrator.
-func (s *Service) ListMembers(ctx context.Context, actor users.User, id uuid.UUID, query string, limit, offset int) ([]Member, int64, error) {
+func (s *Service) ListMembers(ctx context.Context, actor users.User, id uuid.UUID, query string, limit, offset int, orderBy, orderDirection string) ([]Member, int64, error) {
 	if !actor.IsAdmin {
 		return nil, 0, ErrForbidden
 	}
 	if _, err := s.repository.FindByID(ctx, id); err != nil {
 		return nil, 0, err
 	}
-	return s.repository.ListMembers(ctx, id, strings.TrimSpace(query), normalizeLimit(limit), max(offset, 0))
+	return s.repository.ListMembers(
+		ctx,
+		id,
+		strings.TrimSpace(query),
+		normalizeLimit(limit),
+		max(offset, 0),
+		normalizeMemberOrder(orderBy),
+		normalizeOrderDirection(orderDirection),
+	)
 }
 
 // AddMember grants organization access to a provisioned user.
@@ -123,4 +165,32 @@ func normalizeLimit(limit int) int {
 		return 100
 	}
 	return limit
+}
+
+// normalizeOrganizationOrder restricts client input to supported columns.
+func normalizeOrganizationOrder(value string) OrganizationOrder {
+	switch OrganizationOrder(value) {
+	case OrganizationOrderCreatedAt, OrganizationOrderMemberCount:
+		return OrganizationOrder(value)
+	default:
+		return OrganizationOrderName
+	}
+}
+
+// normalizeOrderDirection restricts client input to supported directions.
+func normalizeOrderDirection(value string) OrderDirection {
+	if OrderDirection(value) == OrderDescending {
+		return OrderDescending
+	}
+	return OrderAscending
+}
+
+// normalizeMemberOrder restricts client input to supported member columns.
+func normalizeMemberOrder(value string) MemberOrder {
+	switch MemberOrder(value) {
+	case MemberOrderUsername, MemberOrderEmail, MemberOrderJoinedAt:
+		return MemberOrder(value)
+	default:
+		return MemberOrderDisplayName
+	}
 }

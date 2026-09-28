@@ -4,21 +4,47 @@ import type { OrganizationMember } from '../../api/organizations'
 import type { CurrentUser } from '../../api/users'
 import DataTableEmptyRow from '../DataTableEmptyRow.vue'
 
-const props = defineProps<{ members: OrganizationMember[]; users: CurrentUser[]; loading?: boolean; searching?: boolean }>()
-const emit = defineEmits<{ add: [userID: string]; remove: [userID: string]; search: [query: string] }>()
+type MemberSortKey = 'display_name' | 'username' | 'email' | 'joined_at'
+type SortDirection = 'asc' | 'desc'
+const props = defineProps<{
+  members: OrganizationMember[]
+  users: CurrentUser[]
+  sortBy: MemberSortKey
+  sortDirection: SortDirection
+  loading?: boolean
+  searching?: boolean
+}>()
+const emit = defineEmits<{
+  add: [userID: string]
+  remove: [userID: string]
+  search: [query: string]
+  sort: [column: MemberSortKey]
+}>()
+const memberQuery = defineModel<string | null>('query', { default: '' })
 const selectedUser = shallowRef<CurrentUser | null>(null)
-const searchQuery = shallowRef('')
+const addMemberQuery = shallowRef('')
 const addMemberOpen = shallowRef(false)
 const removeTarget = shallowRef<CurrentUser | null>(null)
 const availableUsers = computed(() => props.users.filter((user) => !props.members.some((member) => member.id === user.id)))
-const noDataText = computed(() => searchQuery.value.trim().length < 2 ? 'Type at least 2 characters to search.' : 'No provisioned users found.')
+const noDataText = computed(() => addMemberQuery.value.trim().length < 2 ? 'Type at least 2 characters to search.' : 'No provisioned users found.')
+const hasMemberQuery = computed(() => Boolean(memberQuery.value?.trim()))
 
 // formatJoinedAt formats the date on which organization access was granted.
 function formatJoinedAt(value: string): string {
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value))
 }
 
-watch(searchQuery, (value, _previous, onCleanup) => {
+function ariaSort(column: MemberSortKey): 'ascending' | 'descending' | 'none' {
+  if (props.sortBy !== column) return 'none'
+  return props.sortDirection === 'asc' ? 'ascending' : 'descending'
+}
+
+function sortIcon(column: MemberSortKey): string {
+  if (props.sortBy !== column) return 'mdi-unfold-more-horizontal'
+  return props.sortDirection === 'asc' ? 'mdi-arrow-up' : 'mdi-arrow-down'
+}
+
+watch(addMemberQuery, (value, _previous, onCleanup) => {
   const query = value.trim()
   if (selectedUser.value && query === selectedUser.value.display_name) return
   if (query.length < 2) {
@@ -39,7 +65,7 @@ function addSelected(): void {
 // openAddMember opens a clean member search dialog.
 function openAddMember(): void {
   selectedUser.value = null
-  searchQuery.value = ''
+  addMemberQuery.value = ''
   addMemberOpen.value = true
 }
 
@@ -47,7 +73,7 @@ function openAddMember(): void {
 function closeAddMember(): void {
   addMemberOpen.value = false
   selectedUser.value = null
-  searchQuery.value = ''
+  addMemberQuery.value = ''
 }
 
 // requestRemove opens the membership removal confirmation dialog.
@@ -65,27 +91,45 @@ function confirmRemove(): void {
 
 <template>
   <div>
-    <div class="d-flex justify-end pa-4">
+    <div class="member-toolbar pa-4">
+      <v-text-field
+        v-model="memberQuery"
+        class="member-search"
+        hide-details
+        clearable
+        placeholder="Search members…"
+        prepend-inner-icon="mdi-magnify"
+        aria-label="Search organization members"
+      />
+      <v-spacer />
       <v-btn color="primary" variant="flat" rounded="lg" prepend-icon="mdi-account-plus-outline" @click="openAddMember">Add member</v-btn>
     </div>
-    <v-progress-linear v-if="loading" indeterminate />
-    <div v-else class="table-scroll">
+    <div class="member-table-shell" :aria-busy="loading">
+      <v-progress-linear v-if="loading" class="member-table-progress" indeterminate color="primary" />
+      <div class="table-scroll member-table-content" :class="{ 'member-table-content--loading': loading }">
       <table class="data-table">
-        <thead><tr><th>MEMBER</th><th>USERNAME</th><th>EMAIL</th><th>ADDED</th><th aria-label="Actions"></th></tr></thead>
+        <thead><tr>
+          <th :aria-sort="ariaSort('display_name')"><button class="sort-header" type="button" @click="emit('sort', 'display_name')">MEMBER<v-icon :icon="sortIcon('display_name')" size="16" /></button></th>
+          <th :aria-sort="ariaSort('username')"><button class="sort-header" type="button" @click="emit('sort', 'username')">USERNAME<v-icon :icon="sortIcon('username')" size="16" /></button></th>
+          <th :aria-sort="ariaSort('email')"><button class="sort-header" type="button" @click="emit('sort', 'email')">EMAIL<v-icon :icon="sortIcon('email')" size="16" /></button></th>
+          <th :aria-sort="ariaSort('joined_at')"><button class="sort-header" type="button" @click="emit('sort', 'joined_at')">ADDED<v-icon :icon="sortIcon('joined_at')" size="16" /></button></th>
+          <th aria-label="Actions"></th>
+        </tr></thead>
         <tbody>
           <tr v-for="member in members" :key="member.id">
             <td>{{ member.display_name }}</td><td>{{ member.username }}</td><td>{{ member.email }}</td><td>{{ formatJoinedAt(member.joined_at) }}</td>
             <td class="table-cell--center"><v-btn size="small" color="error" variant="tonal" prepend-icon="mdi-delete-outline" :aria-label="`Remove ${member.display_name}`" @click="requestRemove(member)">Delete</v-btn></td>
           </tr>
           <DataTableEmptyRow
-            v-if="members.length === 0"
+            v-if="!loading && members.length === 0"
             :colspan="5"
-            title="No members assigned"
-            description="Add a provisioned user to grant access to this organization."
+            :title="hasMemberQuery ? 'No members found' : 'No members assigned'"
+            :description="hasMemberQuery ? 'Adjust your search to display organization members.' : 'Add a provisioned user to grant access to this organization.'"
             icon="mdi-account-off-outline"
           />
         </tbody>
       </table>
+      </div>
     </div>
 
     <v-dialog :model-value="addMemberOpen" max-width="680" @update:model-value="!$event && closeAddMember()">
@@ -95,7 +139,7 @@ function confirmRemove(): void {
           <p class="text-body-2 text-medium-emphasis mb-6">Search for a user who has already signed in to the platform.</p>
           <v-autocomplete
             v-model="selectedUser"
-            v-model:search="searchQuery"
+            v-model:search="addMemberQuery"
             :items="availableUsers"
             :loading="searching"
             :no-data-text="noDataText"
@@ -144,8 +188,21 @@ function confirmRemove(): void {
 </template>
 
 <style scoped>
+.member-toolbar { display: flex; align-items: center; gap: 16px; }
+.member-search { max-width: 420px; }
+.member-table-shell { position: relative; overflow: hidden; }
+.member-table-progress { position: absolute; z-index: 2; top: 0; right: 0; left: 0; }
+.member-table-content { transition: opacity .2s ease, filter .2s ease; }
+.member-table-content--loading { pointer-events: none; opacity: .42; filter: saturate(.7); }
+.sort-header { display: inline-flex; align-items: center; gap: .35rem; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; letter-spacing: inherit; cursor: pointer; }
+.sort-header:focus-visible { outline: 2px solid rgb(var(--v-theme-primary)); outline-offset: 3px; border-radius: 2px; }
 .removal-notice { display: flex; gap: 16px; align-items: flex-start; padding: 22px 24px; color: rgb(var(--v-theme-on-surface)); background: rgba(var(--v-theme-error), .11); border: 1px solid rgba(var(--v-theme-error), .32); border-radius: 14px; }
 .removal-notice__icon { flex: 0 0 auto; margin-top: 1px; color: rgb(var(--v-theme-error)); }
 .removal-notice__title { margin-bottom: 7px; color: #f3f5f9; font-size: 15px; font-weight: 700; }
 .removal-notice p { max-width: 480px; margin: 0; color: #c0c7d4; font-size: 14px; line-height: 1.65; }
+
+@media (max-width: 700px) {
+  .member-toolbar { align-items: stretch; flex-direction: column; }
+  .member-search { max-width: none; }
+}
 </style>

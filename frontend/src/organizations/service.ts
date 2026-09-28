@@ -15,6 +15,8 @@ import {
   type OrganizationInput,
   type OrganizationMember,
   type Page,
+  type PageRequest,
+  type MemberPageRequest,
 } from '../api/organizations'
 import type { CurrentUser } from '../api/users'
 import type { AuthApi } from '../auth/oidc'
@@ -36,11 +38,11 @@ export interface OrganizationApi {
   select(slug: string): Promise<Organization>
   hasMembership(slug: string): boolean
   reset(): void
-  listAdmin(query?: string): Promise<Page<AdminOrganization>>
+  listAdmin(options?: PageRequest): Promise<Page<AdminOrganization>>
   create(input: OrganizationInput): Promise<Organization>
   rename(id: string, name: string): Promise<Organization>
   remove(id: string): Promise<void>
-  listMembers(id: string): Promise<Page<OrganizationMember>>
+  listMembers(id: string, options?: MemberPageRequest): Promise<Page<OrganizationMember>>
   listUsers(query: string): Promise<Page<CurrentUser>>
   addMember(organizationID: string, userID: string): Promise<void>
   removeMember(organizationID: string, userID: string): Promise<void>
@@ -113,11 +115,11 @@ export function createOrganizationService(config: RuntimeConfig, auth: AuthApi, 
     select,
     hasMembership: (slug: string) => state.items.some((item) => item.slug === slug),
     reset,
-    listAdmin: (query = '') => { const [url, token] = credentials(); return fetchAdminOrganizations(url, token, query, fetcher) },
+    listAdmin: (options = {}) => { const [url, token] = credentials(); return fetchAdminOrganizations(url, token, options, fetcher) },
     create: (input) => { const [url, token] = credentials(); return createOrganization(url, token, input, fetcher) },
     rename: (id, name) => { const [url, token] = credentials(); return renameOrganization(url, token, id, name, fetcher) },
     remove: (id) => { const [url, token] = credentials(); return deleteOrganization(url, token, id, fetcher) },
-    listMembers: (id) => { const [url, token] = credentials(); return fetchOrganizationMembers(url, token, id, fetcher) },
+    listMembers: (id, options = {}) => { const [url, token] = credentials(); return fetchOrganizationMembers(url, token, id, options, fetcher) },
     listUsers: (query) => { const [url, token] = credentials(); return fetchProvisionedUsers(url, token, query, fetcher) },
     addMember: (organizationID, userID) => { const [url, token] = credentials(); return addOrganizationMember(url, token, organizationID, userID, fetcher) },
     removeMember: (organizationID, userID) => { const [url, token] = credentials(); return removeOrganizationMember(url, token, organizationID, userID, fetcher) },

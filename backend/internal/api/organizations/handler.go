@@ -6,7 +6,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"strconv"
 
 	"github.com/thomas-illiet/KubeCoder/backend/internal/api/httpx"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/auth"
@@ -46,29 +45,19 @@ func RegisterRoutes(mux *http.ServeMux, handler *Handler) {
 	mux.HandleFunc("PUT /api/v1/organizations/{slug}/preferred", handler.prefer)
 }
 
-type page struct {
-	Items  []domain.Organization `json:"items"`
-	Total  int64                 `json:"total"`
-	Limit  int                   `json:"limit"`
-	Offset int                   `json:"offset"`
-}
-
 // list returns organizations accessible to the current user.
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	actor, ok := h.actor(w, r)
 	if !ok {
 		return
 	}
-	limit, offset := pagination(r)
-	items, total, err := h.service.ListForUser(r.Context(), actor, r.URL.Query().Get("query"), limit, offset)
+	pagination := httpx.ParsePagination(r)
+	items, total, err := h.service.ListForUser(r.Context(), actor, r.URL.Query().Get("query"), pagination.Limit, pagination.Offset)
 	if err != nil {
 		h.internalError(w, r, err)
 		return
 	}
-	if items == nil {
-		items = make([]domain.Organization, 0)
-	}
-	httpx.WriteJSON(w, http.StatusOK, page{Items: items, Total: total, Limit: limit, Offset: offset})
+	httpx.WriteJSON(w, http.StatusOK, httpx.NewPage(items, total, pagination))
 }
 
 // get returns one organization when the current user is a member.
@@ -127,20 +116,4 @@ func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, err error) 
 func (h *Handler) internalError(w http.ResponseWriter, r *http.Request, err error) {
 	h.logger.ErrorContext(r.Context(), "organization request failed", "request_id", httpx.RequestID(r.Context()), "error", err)
 	httpx.WriteProblem(w, r, http.StatusInternalServerError, "Internal Server Error", "The organization operation failed.")
-}
-
-// pagination parses bounded offset pagination parameters.
-func pagination(r *http.Request) (int, int) {
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
-	if limit <= 0 {
-		limit = 20
-	}
-	if limit > 100 {
-		limit = 100
-	}
-	if offset < 0 {
-		offset = 0
-	}
-	return limit, offset
 }

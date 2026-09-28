@@ -28,6 +28,22 @@ export interface OrganizationInput {
   slug: string
 }
 
+export interface PageRequest {
+  query?: string
+  limit?: number
+  offset?: number
+  orderBy?: 'name' | 'created_at' | 'member_count'
+  orderDirection?: 'asc' | 'desc'
+}
+
+export interface MemberPageRequest {
+  query?: string
+  limit?: number
+  offset?: number
+  orderBy?: 'display_name' | 'username' | 'email' | 'joined_at'
+  orderDirection?: 'asc' | 'desc'
+}
+
 async function request<T>(url: string, token: string, fetcher: typeof fetch, init: RequestInit = {}): Promise<T> {
   const response = await fetcher(url, {
     ...init,
@@ -59,10 +75,15 @@ export function preferOrganization(apiBaseUrl: string, token: string, slug: stri
   return request(`${apiBaseUrl}/api/v1/organizations/${encodeURIComponent(slug)}/preferred`, token, fetcher, { method: 'PUT' })
 }
 
-// fetchAdminOrganizations returns all organizations to a platform administrator.
-export function fetchAdminOrganizations(apiBaseUrl: string, token: string, query = '', fetcher: typeof fetch = fetch): Promise<Page<AdminOrganization>> {
-  const parameters = new URLSearchParams({ limit: '100' })
-  if (query) parameters.set('query', query)
+// fetchAdminOrganizations returns one bounded organization page to a platform administrator.
+export function fetchAdminOrganizations(apiBaseUrl: string, token: string, options: PageRequest = {}, fetcher: typeof fetch = fetch): Promise<Page<AdminOrganization>> {
+  const parameters = new URLSearchParams({
+    limit: String(options.limit ?? 20),
+    offset: String(options.offset ?? 0),
+  })
+  if (options.query) parameters.set('query', options.query)
+  if (options.orderBy) parameters.set('order_by', options.orderBy)
+  if (options.orderDirection) parameters.set('order_direction', options.orderDirection)
   return request(`${apiBaseUrl}/api/v1/admin/organizations?${parameters}`, token, fetcher)
 }
 
@@ -82,8 +103,15 @@ export function deleteOrganization(apiBaseUrl: string, token: string, id: string
 }
 
 // fetchOrganizationMembers returns users assigned to an organization.
-export function fetchOrganizationMembers(apiBaseUrl: string, token: string, id: string, fetcher: typeof fetch = fetch): Promise<Page<OrganizationMember>> {
-  return request(`${apiBaseUrl}/api/v1/admin/organizations/${id}/members?limit=100`, token, fetcher)
+export function fetchOrganizationMembers(apiBaseUrl: string, token: string, id: string, options: MemberPageRequest = {}, fetcher: typeof fetch = fetch): Promise<Page<OrganizationMember>> {
+  const parameters = new URLSearchParams({
+    limit: String(options.limit ?? 20),
+    offset: String(options.offset ?? 0),
+  })
+  if (options.query) parameters.set('query', options.query)
+  if (options.orderBy) parameters.set('order_by', options.orderBy)
+  if (options.orderDirection) parameters.set('order_direction', options.orderDirection)
+  return request(`${apiBaseUrl}/api/v1/admin/organizations/${id}/members?${parameters}`, token, fetcher)
 }
 
 // fetchProvisionedUsers returns users that can be assigned to organizations.

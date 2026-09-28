@@ -8,7 +8,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/api/httpx"
@@ -25,12 +24,12 @@ type UserService interface {
 
 // Service defines organization administration operations required by the handler.
 type Service interface {
-	List(context.Context, users.User, string, int, int) ([]domain.OrganizationSummary, int64, error)
+	List(context.Context, users.User, string, int, int, string, string) ([]domain.OrganizationSummary, int64, error)
 	Create(context.Context, users.User, string, string) (domain.Organization, error)
 	Get(context.Context, users.User, uuid.UUID) (domain.Organization, error)
 	Rename(context.Context, users.User, uuid.UUID, string) (domain.Organization, error)
 	Delete(context.Context, users.User, uuid.UUID) error
-	ListMembers(context.Context, users.User, uuid.UUID, string, int, int) ([]domain.Member, int64, error)
+	ListMembers(context.Context, users.User, uuid.UUID, string, int, int, string, string) ([]domain.Member, int64, error)
 	AddMember(context.Context, users.User, uuid.UUID, uuid.UUID) error
 	RemoveMember(context.Context, users.User, uuid.UUID, uuid.UUID) error
 }
@@ -61,27 +60,6 @@ func RegisterRoutes(mux *http.ServeMux, handler *Handler) {
 	mux.HandleFunc("GET /api/v1/admin/users", handler.listUsers)
 }
 
-type organizationPage struct {
-	Items  []domain.OrganizationSummary `json:"items"`
-	Total  int64                        `json:"total"`
-	Limit  int                          `json:"limit"`
-	Offset int                          `json:"offset"`
-}
-
-type userPage struct {
-	Items  []users.User `json:"items"`
-	Total  int64        `json:"total"`
-	Limit  int          `json:"limit"`
-	Offset int          `json:"offset"`
-}
-
-type memberPage struct {
-	Items  []domain.Member `json:"items"`
-	Total  int64           `json:"total"`
-	Limit  int             `json:"limit"`
-	Offset int             `json:"offset"`
-}
-
 type organizationInput struct {
 	Name string `json:"name"`
 	Slug string `json:"slug"`
@@ -97,16 +75,21 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	limit, offset := pagination(r)
-	items, total, err := h.service.List(r.Context(), actor, r.URL.Query().Get("query"), limit, offset)
+	pagination := httpx.ParsePagination(r)
+	items, total, err := h.service.List(
+		r.Context(),
+		actor,
+		r.URL.Query().Get("query"),
+		pagination.Limit,
+		pagination.Offset,
+		r.URL.Query().Get("order_by"),
+		r.URL.Query().Get("order_direction"),
+	)
 	if err != nil {
 		h.writeError(w, r, err)
 		return
 	}
-	if items == nil {
-		items = make([]domain.OrganizationSummary, 0)
-	}
-	httpx.WriteJSON(w, http.StatusOK, organizationPage{Items: items, Total: total, Limit: limit, Offset: offset})
+	httpx.WriteJSON(w, http.StatusOK, httpx.NewPage(items, total, pagination))
 }
 
 // create validates and creates an organization.
@@ -178,16 +161,22 @@ func (h *Handler) listMembers(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	limit, offset := pagination(r)
-	items, total, err := h.service.ListMembers(r.Context(), actor, id, r.URL.Query().Get("query"), limit, offset)
+	pagination := httpx.ParsePagination(r)
+	items, total, err := h.service.ListMembers(
+		r.Context(),
+		actor,
+		id,
+		r.URL.Query().Get("query"),
+		pagination.Limit,
+		pagination.Offset,
+		r.URL.Query().Get("order_by"),
+		r.URL.Query().Get("order_direction"),
+	)
 	if err != nil {
 		h.writeError(w, r, err)
 		return
 	}
-	if items == nil {
-		items = make([]domain.Member, 0)
-	}
-	httpx.WriteJSON(w, http.StatusOK, memberPage{Items: items, Total: total, Limit: limit, Offset: offset})
+	httpx.WriteJSON(w, http.StatusOK, httpx.NewPage(items, total, pagination))
 }
 
 // addMember grants organization access to a provisioned user.
@@ -231,16 +220,13 @@ func (h *Handler) listUsers(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	limit, offset := pagination(r)
-	items, total, err := h.users.List(r.Context(), actor, r.URL.Query().Get("query"), limit, offset)
+	pagination := httpx.ParsePagination(r)
+	items, total, err := h.users.List(r.Context(), actor, r.URL.Query().Get("query"), pagination.Limit, pagination.Offset)
 	if err != nil {
 		h.internalError(w, r, err)
 		return
 	}
-	if items == nil {
-		items = make([]users.User, 0)
-	}
-	httpx.WriteJSON(w, http.StatusOK, userPage{Items: items, Total: total, Limit: limit, Offset: offset})
+	httpx.WriteJSON(w, http.StatusOK, httpx.NewPage(items, total, pagination))
 }
 
 // actorAndID authenticates the actor and parses the organization ID.
@@ -307,20 +293,4 @@ func decode(w http.ResponseWriter, r *http.Request, target any) bool {
 		return false
 	}
 	return true
-}
-
-// pagination parses bounded offset pagination parameters.
-func pagination(r *http.Request) (int, int) {
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
-	if limit <= 0 {
-		limit = 20
-	}
-	if limit > 100 {
-		limit = 100
-	}
-	if offset < 0 {
-		offset = 0
-	}
-	return limit, offset
 }

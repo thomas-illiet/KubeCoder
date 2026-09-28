@@ -67,7 +67,7 @@ func (r *Repository) SetPreferred(ctx context.Context, userID uuid.UUID, slug st
 }
 
 // List returns all organizations for platform administration.
-func (r *Repository) List(ctx context.Context, query string, limit, offset int) ([]OrganizationSummary, int64, error) {
+func (r *Repository) List(ctx context.Context, query string, limit, offset int, orderBy OrganizationOrder, orderDirection OrderDirection) ([]OrganizationSummary, int64, error) {
 	statement := r.db.WithContext(ctx).Model(&Organization{})
 	if query != "" {
 		statement = statement.Where("name ILIKE ? OR slug ILIKE ?", "%"+query+"%", "%"+query+"%")
@@ -83,10 +83,26 @@ func (r *Repository) List(ctx context.Context, query string, limit, offset int) 
 	if query != "" {
 		listStatement = listStatement.Where("organizations.name ILIKE ? OR organizations.slug ILIKE ?", "%"+query+"%", "%"+query+"%")
 	}
-	if err := listStatement.Group("organizations.id").Order("organizations.name, organizations.id").Limit(limit).Offset(offset).Scan(&result).Error; err != nil {
+	if err := listStatement.Group("organizations.id").Order(organizationOrderClause(orderBy, orderDirection)).Limit(limit).Offset(offset).Scan(&result).Error; err != nil {
 		return nil, 0, err
 	}
 	return result, total, nil
+}
+
+// organizationOrderClause returns a deterministic SQL order from trusted enum values.
+func organizationOrderClause(orderBy OrganizationOrder, direction OrderDirection) string {
+	column := "organizations.name"
+	switch orderBy {
+	case OrganizationOrderCreatedAt:
+		column = "organizations.created_at"
+	case OrganizationOrderMemberCount:
+		column = "member_count"
+	}
+	keyword := "ASC"
+	if direction == OrderDescending {
+		keyword = "DESC"
+	}
+	return column + " " + keyword + ", organizations.id ASC"
 }
 
 // Create persists a new organization.
@@ -136,7 +152,7 @@ func (r *Repository) Delete(ctx context.Context, id uuid.UUID) error {
 }
 
 // ListMembers returns provisioned users assigned to an organization.
-func (r *Repository) ListMembers(ctx context.Context, organizationID uuid.UUID, query string, limit, offset int) ([]Member, int64, error) {
+func (r *Repository) ListMembers(ctx context.Context, organizationID uuid.UUID, query string, limit, offset int, orderBy MemberOrder, orderDirection OrderDirection) ([]Member, int64, error) {
 	statement := r.db.WithContext(ctx).Model(&users.User{}).
 		Joins("JOIN organization_memberships ON organization_memberships.user_id = users.id").
 		Where("organization_memberships.organization_id = ?", organizationID)
@@ -149,10 +165,28 @@ func (r *Repository) ListMembers(ctx context.Context, organizationID uuid.UUID, 
 		return nil, 0, err
 	}
 	result := make([]Member, 0)
-	if err := statement.Select("users.*, organization_memberships.created_at AS joined_at").Order("users.display_name, users.id").Limit(limit).Offset(offset).Scan(&result).Error; err != nil {
+	if err := statement.Select("users.*, organization_memberships.created_at AS joined_at").Order(memberOrderClause(orderBy, orderDirection)).Limit(limit).Offset(offset).Scan(&result).Error; err != nil {
 		return nil, 0, err
 	}
 	return result, total, nil
+}
+
+// memberOrderClause returns a deterministic SQL order from trusted enum values.
+func memberOrderClause(orderBy MemberOrder, direction OrderDirection) string {
+	column := "users.display_name"
+	switch orderBy {
+	case MemberOrderUsername:
+		column = "users.username"
+	case MemberOrderEmail:
+		column = "users.email"
+	case MemberOrderJoinedAt:
+		column = "organization_memberships.created_at"
+	}
+	keyword := "ASC"
+	if direction == OrderDescending {
+		keyword = "DESC"
+	}
+	return column + " " + keyword + ", users.id ASC"
 }
 
 // AddMember creates a membership and rejects duplicates.

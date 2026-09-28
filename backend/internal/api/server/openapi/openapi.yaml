@@ -78,6 +78,8 @@ paths:
         - { $ref: '#/components/parameters/Query' }
         - { $ref: '#/components/parameters/Limit' }
         - { $ref: '#/components/parameters/Offset' }
+        - { $ref: '#/components/parameters/OrganizationOrderBy' }
+        - { $ref: '#/components/parameters/OrderDirection' }
       responses:
         '200':
           description: Organization page
@@ -160,6 +162,8 @@ paths:
         - { $ref: '#/components/parameters/Query' }
         - { $ref: '#/components/parameters/Limit' }
         - { $ref: '#/components/parameters/Offset' }
+        - { $ref: '#/components/parameters/MemberOrderBy' }
+        - { $ref: '#/components/parameters/OrderDirection' }
       responses:
         '200':
           description: Member page
@@ -246,6 +250,18 @@ components:
       name: offset
       in: query
       schema: { type: integer, minimum: 0, default: 0 }
+    OrganizationOrderBy:
+      name: order_by
+      in: query
+      schema: { type: string, enum: [name, created_at, member_count], default: name }
+    MemberOrderBy:
+      name: order_by
+      in: query
+      schema: { type: string, enum: [display_name, username, email, joined_at], default: display_name }
+    OrderDirection:
+      name: order_direction
+      in: query
+      schema: { type: string, enum: [asc, desc], default: asc }
     OrganizationID:
       name: id
       in: path
