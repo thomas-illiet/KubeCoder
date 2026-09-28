@@ -10,6 +10,7 @@ Le prototype est une application frontend en Vue 3, TypeScript et Vuetify 3. Les
 helm upgrade --install kubecoder-auth ./deploy/helm/kubecoder-keycloak \
   --namespace kubecoder-auth --create-namespace --wait --timeout 10m
 
+cd frontend
 cp .env.example .env.local
 npm install
 npm run dev
@@ -22,6 +23,7 @@ Le compte local est `admin` / `admin`. Le frontend utilise une bibliothèque OID
 Pour vérifier le build de production :
 
 ```powershell
+cd frontend
 npm run build
 ```
 
