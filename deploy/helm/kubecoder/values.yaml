@@ -63,7 +63,7 @@ externalDatabase:
   dsnSecretKey: dsn
 
 migration:
-  expectedVersion: 1
+  expectedVersion: "20260928101656"
   waitTimeout: 5m
   ttlSecondsAfterFinished: 600
   backoffLimit: 3

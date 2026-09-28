@@ -42,11 +42,31 @@ func (r *Repository) Upsert(ctx context.Context, identity auth.Identity) (User, 
 		if err != nil {
 			return fmt.Errorf("upsert user: %w", err)
 		}
-		result = candidate
+		if err := tx.Preload("PreferredOrganization").First(&result, "id = ?", candidate.ID).Error; err != nil {
+			return fmt.Errorf("load user preference: %w", err)
+		}
 		return nil
 	})
 	if err != nil {
 		return User{}, err
 	}
 	return result, nil
+}
+
+// List returns provisioned users whose identifying fields match the query.
+func (r *Repository) List(ctx context.Context, query string, limit, offset int) ([]User, int64, error) {
+	statement := r.db.WithContext(ctx).Model(&User{})
+	if query != "" {
+		pattern := "%" + query + "%"
+		statement = statement.Where("username ILIKE ? OR display_name ILIKE ? OR email ILIKE ?", pattern, pattern, pattern)
+	}
+	var total int64
+	if err := statement.Count(&total).Error; err != nil {
+		return nil, 0, fmt.Errorf("count users: %w", err)
+	}
+	result := make([]User, 0)
+	if err := statement.Order("display_name, id").Limit(limit).Offset(offset).Find(&result).Error; err != nil {
+		return nil, 0, fmt.Errorf("list users: %w", err)
+	}
+	return result, total, nil
 }

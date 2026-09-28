@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import StatusChip from '../components/StatusChip.vue'
 import { useNotifications } from '../composables/useNotifications'
 
@@ -28,6 +29,8 @@ type ChangedFile = {
 }
 
 const activeTab = ref<'chat' | 'changes'>('chat')
+const route = useRoute()
+const sessionsTarget = computed(() => `/organizations/${String(route.params.organizationSlug ?? '')}/sessions`)
 const draft = ref('')
 const { warning } = useNotifications()
 const messages = ref<ChatMessage[]>([
@@ -110,7 +113,7 @@ function stopRun() {
 <template>
   <v-card class="session-header mb-4">
     <div class="session-header__main">
-      <v-btn to="/organization/sessions" icon="mdi-arrow-left" variant="text" aria-label="Back to sessions" />
+      <v-btn :to="sessionsTarget" icon="mdi-arrow-left" variant="text" aria-label="Back to sessions" />
       <div class="session-agent-icon"><v-icon icon="mdi-creation-outline" size="22" /></div>
       <div class="min-w-0"><div class="session-header__title">Complete the OAuth migration</div><div class="session-header__meta"><span class="code-text">identity-service</span><span>feat/oidc</span><span>Atlas · OpenCode 1.2</span></div></div>
       <v-spacer />

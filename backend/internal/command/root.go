@@ -13,7 +13,9 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	adminorganizationapi "github.com/thomas-illiet/KubeCoder/backend/internal/api/admin/organizations"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/api/health"
+	organizationapi "github.com/thomas-illiet/KubeCoder/backend/internal/api/organizations"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/api/server"
 	userapi "github.com/thomas-illiet/KubeCoder/backend/internal/api/users"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/auth"
@@ -21,6 +23,7 @@ import (
 	"github.com/thomas-illiet/KubeCoder/backend/internal/database"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/logging"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/migration"
+	"github.com/thomas-illiet/KubeCoder/backend/internal/organizations"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/users"
 )
 
@@ -87,8 +90,11 @@ func (a *application) serveCommand() *cobra.Command {
 			}
 			userService := users.NewService(users.NewRepository(db.GORM))
 			userHandler := userapi.NewHandler(logger, verifier, userService)
+			organizationService := organizations.NewService(organizations.NewRepository(db.GORM))
+			organizationHandler := organizationapi.NewHandler(logger, verifier, userService, organizationService)
+			adminOrganizationHandler := adminorganizationapi.NewHandler(logger, verifier, userService, organizationService)
 			healthHandler := health.NewHandler(db.SQL, health.SchemaReady(db.SQL))
-			handler := server.New(logger, healthHandler, userHandler, cfg.HTTP.AllowedOrigins)
+			handler := server.New(logger, healthHandler, userHandler, organizationHandler, adminOrganizationHandler, cfg.HTTP.AllowedOrigins)
 			server := &http.Server{
 				Addr: cfg.HTTP.Address, Handler: handler, ReadTimeout: cfg.HTTP.ReadTimeout,
 				WriteTimeout: cfg.HTTP.WriteTimeout, IdleTimeout: cfg.HTTP.IdleTimeout,

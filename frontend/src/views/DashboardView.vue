@@ -8,7 +8,7 @@ const router = useRouter()
 const stats = [
   { label: 'Published agents', value: '3', caption: '2 definitions not published', icon: 'mdi-robot-outline', color: '#7c86ff', glow: 'rgba(124,134,255,.16)' },
   { label: 'Secrets', value: '4', caption: '2 active · 2 need attention', icon: 'mdi-key-variant', color: '#33d2d0', glow: 'rgba(51,210,208,.13)' },
-  { label: 'Members', value: '5', caption: '2 administrator roles', icon: 'mdi-account-group-outline', color: '#5aa7ff', glow: 'rgba(90,167,255,.14)' },
+  { label: 'Organizations', value: '—', caption: 'Managed through the API', icon: 'mdi-domain', color: '#5aa7ff', glow: 'rgba(90,167,255,.14)' },
   { label: 'Alerts', value: '2', caption: 'Secret attention required', icon: 'mdi-alert-circle-outline', color: '#f6b84c', glow: 'rgba(246,184,76,.14)' },
 ]
 
@@ -16,13 +16,13 @@ const activity = [
   { icon: 'mdi-robot-outline', title: 'Agent “Atlas” published', meta: 'Alex Martin · version 3', time: '12 min ago' },
   { icon: 'mdi-key-variant', title: 'Secret “MODEL_API_TOKEN” rotated', meta: 'Samira Chen · organization', time: '1 hour ago' },
   { icon: 'mdi-puzzle-outline', title: 'Skill “Go reviewer” enabled', meta: 'Repository policy', time: '3 hours ago' },
-  { icon: 'mdi-account-plus-outline', title: 'Invitation sent', meta: 'Jamie Rivera · Member role', time: 'Yesterday' },
+  { icon: 'mdi-account-plus-outline', title: 'Membership updated', meta: 'Organization access', time: 'Yesterday' },
 ]
 
 const quickLinks = [
   { title: 'Create agent', subtitle: 'Configure a new definition', icon: 'mdi-robot-outline', to: '/admin/agents' },
   { title: 'Add secret', subtitle: 'Create a protected reference', icon: 'mdi-key-plus', to: '/admin/secrets' },
-  { title: 'Invite member', subtitle: 'Grant workspace access', icon: 'mdi-account-plus-outline', to: '/admin/members' },
+  { title: 'Manage organizations', subtitle: 'Grant workspace access', icon: 'mdi-domain', to: '/admin/organizations' },
 ]
 </script>
 

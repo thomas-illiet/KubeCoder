@@ -23,6 +23,201 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/InternalError'
+  /api/v1/organizations:
+    get:
+      operationId: listUserOrganizations
+      summary: List organizations accessible to the authenticated user
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/Query' }
+        - { $ref: '#/components/parameters/Limit' }
+        - { $ref: '#/components/parameters/Offset' }
+      responses:
+        '200':
+          description: Accessible organizations
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrganizationPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/v1/organizations/{slug}:
+    parameters:
+      - { $ref: '#/components/parameters/OrganizationSlug' }
+    get:
+      operationId: getUserOrganization
+      summary: Return an organization accessible to the authenticated user
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Accessible organization
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Organization' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/organizations/{slug}/preferred:
+    parameters:
+      - { $ref: '#/components/parameters/OrganizationSlug' }
+    put:
+      operationId: setPreferredOrganization
+      summary: Set the authenticated user preferred organization
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Preferred organization
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Organization' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/admin/organizations:
+    get:
+      operationId: listOrganizations
+      summary: List all organizations
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/Query' }
+        - { $ref: '#/components/parameters/Limit' }
+        - { $ref: '#/components/parameters/Offset' }
+      responses:
+        '200':
+          description: Organization page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminOrganizationPage' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: createOrganization
+      summary: Create an organization
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateOrganization' }
+      responses:
+        '201':
+          description: Created organization
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Organization' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/admin/organizations/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/OrganizationID' }
+    get:
+      operationId: getOrganization
+      summary: Return an organization for administration
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Organization
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Organization' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      operationId: renameOrganization
+      summary: Rename an organization
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 120 }
+              additionalProperties: false
+      responses:
+        '200':
+          description: Updated organization
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Organization' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      operationId: deleteOrganization
+      summary: Permanently delete an organization
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: Organization deleted }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/admin/organizations/{id}/members:
+    parameters:
+      - { $ref: '#/components/parameters/OrganizationID' }
+    get:
+      operationId: listOrganizationMembers
+      summary: List organization members
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/Query' }
+        - { $ref: '#/components/parameters/Limit' }
+        - { $ref: '#/components/parameters/Offset' }
+      responses:
+        '200':
+          description: Member page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrganizationMemberPage' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      operationId: addOrganizationMember
+      summary: Add a provisioned user to an organization
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id]
+              properties:
+                user_id: { type: string, format: uuid }
+              additionalProperties: false
+      responses:
+        '204': { description: Membership created }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/admin/organizations/{id}/members/{userID}:
+    parameters:
+      - { $ref: '#/components/parameters/OrganizationID' }
+      - name: userID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      operationId: removeOrganizationMember
+      summary: Remove a user from an organization
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: Membership removed }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/admin/users:
+    get:
+      operationId: listProvisionedUsers
+      summary: List provisioned users for membership assignment
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/Query' }
+        - { $ref: '#/components/parameters/Limit' }
+        - { $ref: '#/components/parameters/Offset' }
+      responses:
+        '200':
+          description: Provisioned user page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserPage' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /healthz:
     get:
       operationId: health
@@ -38,6 +233,29 @@ paths:
         '503':
           description: API is not ready
 components:
+  parameters:
+    Query:
+      name: query
+      in: query
+      schema: { type: string }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    Offset:
+      name: offset
+      in: query
+      schema: { type: integer, minimum: 0, default: 0 }
+    OrganizationID:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    OrganizationSlug:
+      name: slug
+      in: path
+      required: true
+      schema: { type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$' }
   securitySchemes:
     bearerAuth:
       type: http
@@ -46,7 +264,7 @@ components:
   schemas:
     User:
       type: object
-      required: [id, subject, username, display_name, email, is_admin, created_at, updated_at]
+      required: [id, subject, username, display_name, email, is_admin, preferred_organization, created_at, updated_at]
       properties:
         id: { type: string, format: uuid }
         subject: { type: string }
@@ -54,8 +272,88 @@ components:
         display_name: { type: string }
         email: { type: string, format: email }
         is_admin: { type: boolean }
+        preferred_organization:
+          allOf:
+            - { $ref: '#/components/schemas/OrganizationSummary' }
+          nullable: true
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
+    OrganizationSummary:
+      type: object
+      required: [id, name, slug]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        slug: { type: string }
+    Organization:
+      allOf:
+        - { $ref: '#/components/schemas/OrganizationSummary' }
+        - type: object
+          required: [created_at, updated_at]
+          properties:
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+    CreateOrganization:
+      type: object
+      required: [name, slug]
+      properties:
+        name: { type: string, maxLength: 120 }
+        slug: { type: string, maxLength: 63, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$' }
+      additionalProperties: false
+    OrganizationPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Organization' }
+        total: { type: integer, format: int64 }
+        limit: { type: integer }
+        offset: { type: integer }
+    AdminOrganization:
+      allOf:
+        - { $ref: '#/components/schemas/Organization' }
+        - type: object
+          required: [member_count]
+          properties:
+            member_count: { type: integer, format: int64, minimum: 0 }
+    AdminOrganizationPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AdminOrganization' }
+        total: { type: integer, format: int64 }
+        limit: { type: integer }
+        offset: { type: integer }
+    UserPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/User' }
+        total: { type: integer, format: int64 }
+        limit: { type: integer }
+        offset: { type: integer }
+    OrganizationMember:
+      allOf:
+        - { $ref: '#/components/schemas/User' }
+        - type: object
+          required: [joined_at]
+          properties:
+            joined_at: { type: string, format: date-time }
+    OrganizationMemberPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/OrganizationMember' }
+        total: { type: integer, format: int64 }
+        limit: { type: integer }
+        offset: { type: integer }
     Problem:
       type: object
       required: [type, title, status, detail, instance, correlation_id]
@@ -67,6 +365,26 @@ components:
         instance: { type: string }
         correlation_id: { type: string, format: uuid }
   responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: Access forbidden
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: Resource not found
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Conflict:
+      description: Resource conflict
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
     Unauthorized:
       description: Authentication required or invalid
       content:

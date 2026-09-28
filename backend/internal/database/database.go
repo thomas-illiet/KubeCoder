@@ -18,7 +18,9 @@ type DB struct {
 
 // Open creates and verifies a configured PostgreSQL connection pool.
 func Open(ctx context.Context, cfg config.DatabaseConfig) (*DB, error) {
-	gormDB, err := gorm.Open(postgres.Open(cfg.DSN), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent), DisableForeignKeyConstraintWhenMigrating: true})
+	gormDB, err := gorm.Open(postgres.Open(cfg.DSN), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent), DisableForeignKeyConstraintWhenMigrating: true, TranslateError: true,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}

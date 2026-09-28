@@ -4,7 +4,8 @@ import { useDisplay } from 'vuetify'
 import { useRoute, useRouter } from 'vue-router'
 import { useNotifications } from '../composables/useNotifications'
 import { useAuth } from '../composables/useAuth'
-import { canShowWorkspaceSwitch, type LayoutMode } from './navigation'
+import { useOrganizations } from '../composables/useOrganizations'
+import { canShowWorkspaceSwitch, isSearchShortcut, type LayoutMode } from './navigation'
 
 type NavigationItem = { title: string; icon: string; to: string }
 type NavigationGroup = { title: string; items: NavigationItem[] }
@@ -13,8 +14,9 @@ const props = defineProps<{ mode: LayoutMode }>()
 const { smAndDown: mobile } = useDisplay()
 const route = useRoute()
 const router = useRouter()
-const { success } = useNotifications()
+const { success, error: notifyError } = useNotifications()
 const { displayName, username, initials, isAdmin } = useAuth()
+const organizationService = useOrganizations()
 const drawer = ref(!mobile.value)
 const rail = ref(false)
 const commandOpen = ref(false)
@@ -22,7 +24,6 @@ const commandQuery = ref('')
 const vibesActive = ref(false)
 const organizationOpen = ref(false)
 const organizationQuery = ref('')
-const organization = ref('Northstar Labs')
 let vibesTimer: ReturnType<typeof setTimeout> | undefined
 
 watch(mobile, (isMobile) => {
@@ -38,43 +39,36 @@ const vibePods = [
   { icon: 'mdi-cube-outline', x: '90%', y: '66%', delay: '-2.2s', duration: '4.9s' },
 ]
 
-const organizations = [
-  { name: 'Northstar Labs', slug: 'northstar-labs', role: 'Owner', initials: 'NL' },
-  { name: 'Orbit Systems', slug: 'orbit-systems', role: 'Admin', initials: 'OS' },
-  { name: 'Acme Engineering', slug: 'acme-engineering', role: 'Member', initials: 'AE' },
-  { name: 'Lumen Platform', slug: 'lumen-platform', role: 'Admin', initials: 'LP' },
-  { name: 'Nova Research', slug: 'nova-research', role: 'Member', initials: 'NR' },
-]
-
-const organizationGroups: NavigationGroup[] = [
+const organizationBase = computed(() => `/organizations/${organizationService.state.current?.slug ?? ''}`)
+const organizationGroups = computed<NavigationGroup[]>(() => [
   {
     title: 'General',
     items: [
-      { title: 'Overview', icon: 'mdi-view-dashboard-outline', to: '/organization' },
+      { title: 'Overview', icon: 'mdi-view-dashboard-outline', to: organizationBase.value },
     ],
   },
   {
     title: 'Workspace',
     items: [
-      { title: 'Repositories', icon: 'mdi-source-repository', to: '/organization/repositories' },
-      { title: 'Sessions', icon: 'mdi-message-text-outline', to: '/organization/sessions' },
+      { title: 'Repositories', icon: 'mdi-source-repository', to: `${organizationBase.value}/repositories` },
+      { title: 'Sessions', icon: 'mdi-message-text-outline', to: `${organizationBase.value}/sessions` },
     ],
   },
   {
     title: 'Configuration',
     items: [
-      { title: 'Skills', icon: 'mdi-puzzle-outline', to: '/organization/skills' },
-      { title: 'MCP servers', icon: 'mdi-server-network-outline', to: '/organization/mcp' },
-      { title: 'Secrets', icon: 'mdi-key-variant', to: '/organization/secrets' },
+      { title: 'Skills', icon: 'mdi-puzzle-outline', to: `${organizationBase.value}/skills` },
+      { title: 'MCP servers', icon: 'mdi-server-network-outline', to: `${organizationBase.value}/mcp` },
+      { title: 'Secrets', icon: 'mdi-key-variant', to: `${organizationBase.value}/secrets` },
     ],
   },
   {
     title: 'Organization',
     items: [
-      { title: 'Settings', icon: 'mdi-tune-variant', to: '/organization/settings' },
+      { title: 'Settings', icon: 'mdi-tune-variant', to: `${organizationBase.value}/settings` },
     ],
   },
-]
+])
 
 const adminGroups: NavigationGroup[] = [
   {
@@ -95,7 +89,7 @@ const adminGroups: NavigationGroup[] = [
     title: 'Security & access',
     items: [
       { title: 'Secrets', icon: 'mdi-key-variant', to: '/admin/secrets' },
-      { title: 'Members', icon: 'mdi-account-group-outline', to: '/admin/members' },
+      { title: 'Organizations', icon: 'mdi-domain', to: '/admin/organizations' },
     ],
   },
   {
@@ -106,7 +100,7 @@ const adminGroups: NavigationGroup[] = [
   },
 ]
 
-const navigationGroups = computed(() => props.mode === 'admin' ? adminGroups : organizationGroups)
+const navigationGroups = computed(() => props.mode === 'admin' ? adminGroups : organizationGroups.value)
 const navigationItems = computed(() => navigationGroups.value.flatMap((group) => group.items))
 const filteredNavigationItems = computed(() => {
   const term = commandQuery.value.trim().toLocaleLowerCase('en')
@@ -115,25 +109,34 @@ const filteredNavigationItems = computed(() => {
 })
 const vibesCommandReady = computed(() => commandQuery.value.trim().toLocaleLowerCase('en') === 'kubectl get vibes')
 const layoutLabel = computed(() => props.mode === 'admin' ? 'ADMINISTRATION' : 'ORGANIZATION')
-const switchTarget = computed(() => props.mode === 'admin' ? '/organization' : '/admin')
+const switchTarget = computed(() => props.mode === 'admin' ? (organizationService.state.current ? organizationBase.value : '/organization') : '/admin')
 const switchTitle = computed(() => props.mode === 'admin' ? 'Back to organization' : 'Administration')
 const switchSubtitle = computed(() => props.mode === 'admin' ? 'Return to the developer workspace' : 'Open the dedicated console')
 const switchIcon = computed(() => props.mode === 'admin' ? 'mdi-arrow-left' : 'mdi-shield-crown-outline')
 const showWorkspaceSwitch = computed(() => canShowWorkspaceSwitch(props.mode, isAdmin.value))
-const profileTarget = computed(() => props.mode === 'admin' ? '/admin/profile' : '/organization/profile')
+const profileTarget = computed(() => props.mode === 'admin' ? '/admin/profile' : `${organizationBase.value}/profile`)
 const title = computed(() => route.meta.title as string)
 const subtitle = computed(() => route.meta.subtitle as string)
-const currentOrganization = computed(() => organizations.find((item) => item.name === organization.value) ?? organizations[0])
+const currentOrganization = computed(() => {
+  const item = organizationService.state.current ?? organizationService.state.items[0]
+  const initials = item?.name.split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'OR'
+  return { ...item, initials }
+})
 const organizationResults = computed(() => {
   const term = organizationQuery.value.trim().toLocaleLowerCase('en')
-  if (!term) return organizations.slice(0, 3)
-  return organizations.filter((item) => `${item.name} ${item.slug}`.toLocaleLowerCase('en').includes(term)).slice(0, 5)
+  if (!term) return organizationService.state.items.slice(0, 5)
+  return organizationService.state.items.filter((item) => `${item.name} ${item.slug}`.toLocaleLowerCase('en').includes(term)).slice(0, 5)
 })
 
-function selectOrganization(name: string) {
-  organization.value = name
-  organizationOpen.value = false
-  organizationQuery.value = ''
+async function selectOrganization(slug: string) {
+  try {
+    await organizationService.select(slug)
+    organizationOpen.value = false
+    organizationQuery.value = ''
+    await router.push(`/organizations/${slug}`)
+  } catch (selectionError) {
+    notifyError('Organization could not be selected', selectionError instanceof Error ? selectionError.message : undefined)
+  }
 }
 
 function toggleDrawer() {
@@ -164,13 +167,18 @@ function triggerVibes() {
   vibesTimer = setTimeout(() => stopVibes(true), 8000)
 }
 
-function handleEscape(event: KeyboardEvent) {
+function handleGlobalKeydown(event: KeyboardEvent) {
+  if (isSearchShortcut(event)) {
+    event.preventDefault()
+    commandOpen.value = true
+    return
+  }
   if (event.key === 'Escape' && vibesActive.value) stopVibes()
 }
 
-onMounted(() => window.addEventListener('keydown', handleEscape))
+onMounted(() => window.addEventListener('keydown', handleGlobalKeydown))
 onBeforeUnmount(() => {
-  window.removeEventListener('keydown', handleEscape)
+  window.removeEventListener('keydown', handleGlobalKeydown)
   if (vibesTimer) clearTimeout(vibesTimer)
 })
 
@@ -206,16 +214,16 @@ function resetCommandSearch() {
 
     <v-app-bar flat height="74" class="app-bar px-2 px-sm-4">
       <v-btn icon="mdi-menu" variant="text" aria-label="Collapse navigation" @click="toggleDrawer" />
-      <v-btn v-if="mode === 'organization'" variant="text" class="org-switcher ml-1 ml-sm-3" @click="organizationOpen = true"><div class="org-avatar org-avatar--small">{{ currentOrganization.initials }}</div><span class="d-none d-sm-inline ml-2">{{ organization }}</span><v-icon icon="mdi-chevron-down" size="18" class="ml-1" /></v-btn>
+      <v-btn v-if="mode === 'organization'" variant="text" class="org-switcher ml-1 ml-sm-3" @click="organizationOpen = true"><div class="org-avatar org-avatar--small">{{ currentOrganization.initials }}</div><span class="d-none d-sm-inline ml-2">{{ currentOrganization.name }}</span><v-icon icon="mdi-chevron-down" size="18" class="ml-1" /></v-btn>
       <v-spacer />
-      <v-btn class="search-trigger d-none d-md-flex" variant="outlined" color="default" @click="commandOpen = true"><v-icon icon="mdi-magnify" size="20" class="mr-2" />Search<span class="shortcut ml-8">⌘ K</span></v-btn>
+      <v-btn class="search-trigger d-none d-md-flex" variant="outlined" color="default" aria-keyshortcuts="Meta+K Control+K" @click="commandOpen = true"><v-icon icon="mdi-magnify" size="20" class="mr-2" />Search<span class="shortcut">⌘ K</span></v-btn>
       <v-btn icon="mdi-magnify" variant="text" class="d-md-none" aria-label="Search" @click="commandOpen = true" />
-      <v-menu><template #activator="{ props: menuProps }"><v-btn v-bind="menuProps" icon class="ml-1 user-avatar" aria-label="Profile menu">{{ initials }}</v-btn></template><v-list width="230" class="pa-2"><v-list-item :title="displayName" :subtitle="username || 'OpenID Connect user'" /><v-divider class="my-2" /><v-list-item title="Profile" prepend-icon="mdi-account-circle-outline" @click="router.push(profileTarget)" /><v-list-item title="Sign out" prepend-icon="mdi-logout" @click="router.push('/logout')" /></v-list></v-menu>
+      <v-menu><template #activator="{ props: menuProps }"><v-btn v-bind="menuProps" icon class="ml-3 user-avatar" aria-label="Profile menu">{{ initials }}</v-btn></template><v-list width="230" class="pa-2"><v-list-item :title="displayName" :subtitle="username || 'OpenID Connect user'" /><v-divider class="my-2" /><v-list-item title="Profile" prepend-icon="mdi-account-circle-outline" @click="router.push(profileTarget)" /><v-list-item title="Sign out" prepend-icon="mdi-logout" @click="router.push('/logout')" /></v-list></v-menu>
     </v-app-bar>
 
     <v-main>
       <div class="page-shell">
-        <div class="breadcrumb mb-3"><span>{{ mode === 'admin' ? 'KubeCoder' : organization }}</span><v-icon icon="mdi-chevron-right" size="15" /><span>{{ route.meta.section }}</span><v-icon icon="mdi-chevron-right" size="15" /><strong>{{ title }}</strong></div>
+        <div class="breadcrumb mb-3"><span>{{ mode === 'admin' ? 'KubeCoder' : currentOrganization.name }}</span><v-icon icon="mdi-chevron-right" size="15" /><span>{{ route.meta.section }}</span><v-icon icon="mdi-chevron-right" size="15" /><strong>{{ title }}</strong></div>
         <div class="page-title-row"><div><h1>{{ title }}</h1><p>{{ subtitle }}</p></div></div>
         <router-view />
       </div>
@@ -242,8 +250,8 @@ function resetCommandSearch() {
     <v-dialog v-if="mode === 'organization'" v-model="organizationOpen" max-width="640">
       <v-card class="app-dialog organization-dialog">
         <div class="dialog-header"><div><div class="text-h6 font-weight-bold">Switch organization</div><div class="text-caption text-medium-emphasis">Search across 2,437 accessible organizations</div></div><v-btn icon="mdi-close" variant="text" aria-label="Close" @click="organizationOpen = false" /></div>
-        <div class="pa-4"><v-text-field v-model="organizationQuery" autofocus hide-details placeholder="Organization name or identifier…" prepend-inner-icon="mdi-magnify" clearable /><div class="d-flex align-center justify-space-between mt-4 mb-2 px-2"><div class="eyebrow">{{ organizationQuery ? 'RESULTS' : 'RECENT ORGANIZATIONS' }}</div><div class="text-caption text-medium-emphasis">5 results maximum</div></div><v-list bg-color="transparent"><v-list-item v-for="item in organizationResults" :key="item.slug" :title="item.name" :subtitle="`${item.slug} · ${item.role}`" rounded="lg" @click="selectOrganization(item.name)"><template #prepend><div class="org-avatar mr-3">{{ item.initials }}</div></template><template #append><v-icon v-if="organization === item.name" icon="mdi-check-circle" color="success" /></template></v-list-item></v-list><div v-if="organizationQuery && organizationResults.length === 0" class="empty-state py-8"><div class="empty-state__icon"><v-icon icon="mdi-domain-off" /></div><h3>No organizations found</h3><p>Try a different name or identifier.</p></div><div class="security-note mt-3"><v-icon icon="mdi-server-network-outline" color="info" /><span>Search will run server-side with pagination; the full list will never be loaded in the browser.</span></div></div>
-        <v-card-actions class="dialog-actions"><v-btn variant="text" prepend-icon="mdi-open-in-new" @click="router.push('/organization'); organizationOpen = false">Open organization workspace</v-btn><v-spacer /><v-btn variant="text" prepend-icon="mdi-cog-outline" @click="router.push('/organization/settings'); organizationOpen = false">Available settings</v-btn></v-card-actions>
+        <div class="pa-4"><v-text-field v-model="organizationQuery" autofocus hide-details placeholder="Organization name or identifier…" prepend-inner-icon="mdi-magnify" clearable /><div class="d-flex align-center justify-space-between mt-4 mb-2 px-2"><div class="eyebrow">{{ organizationQuery ? 'RESULTS' : 'YOUR ORGANIZATIONS' }}</div><div class="text-caption text-medium-emphasis">5 results maximum</div></div><v-list bg-color="transparent"><v-list-item v-for="item in organizationResults" :key="item.slug" :title="item.name" :subtitle="item.slug" rounded="lg" @click="selectOrganization(item.slug)"><template #prepend><div class="org-avatar mr-3">{{ item.name.slice(0, 2).toUpperCase() }}</div></template><template #append><v-icon v-if="currentOrganization.slug === item.slug" icon="mdi-check-circle" color="success" /></template></v-list-item></v-list><div v-if="organizationQuery && organizationResults.length === 0" class="empty-state py-8"><div class="empty-state__icon"><v-icon icon="mdi-domain-off" /></div><h3>No organizations found</h3><p>Try a different name or identifier.</p></div></div>
+        <v-card-actions class="dialog-actions"><v-btn variant="text" prepend-icon="mdi-open-in-new" @click="router.push(organizationBase); organizationOpen = false">Open organization workspace</v-btn><v-spacer /><v-btn variant="text" prepend-icon="mdi-cog-outline" @click="router.push(`${organizationBase}/settings`); organizationOpen = false">Available settings</v-btn></v-card-actions>
       </v-card>
     </v-dialog>
 

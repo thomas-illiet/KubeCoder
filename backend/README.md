@@ -1,6 +1,6 @@
 # KubeCoder backend
 
-The backend is a Go HTTP API backed by PostgreSQL. Its first business endpoint is `GET /api/v1/users/me`, authenticated with an OIDC Bearer access token.
+The backend is a Go HTTP API backed by PostgreSQL. User and organization endpoints are authenticated with an OIDC Bearer access token.
 
 ## Local commands
 
@@ -20,8 +20,12 @@ The HTTP transport is split into subpackages so API growth does not create a fla
 - `internal/api/server`: route composition and embedded OpenAPI documentation;
 - `internal/api/health`: liveness, readiness, and schema checks;
 - `internal/api/users`: user HTTP handlers;
+- `internal/api/organizations`: membership-protected organization handlers;
+- `internal/api/admin/organizations`: platform organization administration;
 - `internal/api/httpx`: shared HTTP middleware and response helpers;
 - `internal/users`: user model, service, and PostgreSQL repository.
+- `internal/organizations`: organization and membership services and persistence.
+- `internal/models`: GORM schema consumed by Atlas.
 
 New API categories must be added as their own `internal/api/<category>` package and registered explicitly by `internal/api/server`.
 
@@ -32,7 +36,7 @@ kubecoder serve
 kubecoder migrate up
 kubecoder migrate down [steps]
 kubecoder migrate version
-kubecoder migrate wait --version 1
+kubecoder migrate wait --version 20260928101656
 kubecoder version
 ```
 

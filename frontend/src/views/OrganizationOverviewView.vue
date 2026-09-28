@@ -1,14 +1,17 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import NewSessionDialog, { type CreatedSession } from '../components/NewSessionDialog.vue'
 import SectionCard from '../components/SectionCard.vue'
 import StatusChip from '../components/StatusChip.vue'
 import { useNotifications } from '../composables/useNotifications'
+import { useOrganizations } from '../composables/useOrganizations'
 
 const router = useRouter()
 const sessionOpen = ref(false)
 const { success } = useNotifications()
+const organizations = useOrganizations()
+const organizationBase = computed(() => `/organizations/${organizations.state.current?.slug ?? ''}`)
 
 function sessionCreated(session: CreatedSession) {
   success('Session created', `${session.profile} is queued for ${session.repository}.`)
@@ -31,7 +34,7 @@ const sessions = [
 <template>
   <v-card class="workspace-hero mb-4">
     <div class="workspace-hero__content">
-      <div><div class="eyebrow mb-2">ORGANIZATION WORKSPACE</div><h2>Resume work in Northstar Labs</h2><p>Choose a repository and a published agent, then start a session without accessing sensitive administration settings.</p></div>
+      <div><div class="eyebrow mb-2">ORGANIZATION WORKSPACE</div><h2>Resume work in {{ organizations.state.current?.name }}</h2><p>Choose a repository and a published agent, then start a session without accessing sensitive administration settings.</p></div>
       <v-btn color="primary" prepend-icon="mdi-plus" size="large" @click="sessionOpen = true">New session</v-btn>
     </div>
   </v-card>
@@ -45,7 +48,7 @@ const sessions = [
 
   <div class="split-grid">
     <SectionCard title="Recent sessions" subtitle="Resume a conversation or check its status">
-      <template #actions><v-btn variant="text" color="primary" @click="router.push('/organization/sessions')">All sessions</v-btn></template>
+      <template #actions><v-btn variant="text" color="primary" @click="router.push(`${organizationBase}/sessions`)">All sessions</v-btn></template>
       <div class="activity-list">
         <div v-for="item in sessions" :key="item.title" class="activity-item">
           <div class="activity-icon"><v-icon icon="mdi-message-text-outline" /></div>
@@ -56,8 +59,8 @@ const sessions = [
     </SectionCard>
     <SectionCard title="Quick access" subtitle="Developer workflow">
       <v-list bg-color="transparent" class="py-2">
-        <v-list-item title="Browse repositories" subtitle="Configure an authorized agent" prepend-icon="mdi-source-repository" append-icon="mdi-chevron-right" @click="router.push('/organization/repositories')" />
-        <v-list-item title="Review skills" subtitle="Understand the effective configuration" prepend-icon="mdi-puzzle-outline" append-icon="mdi-chevron-right" @click="router.push('/organization/skills')" />
+        <v-list-item title="Browse repositories" subtitle="Configure an authorized agent" prepend-icon="mdi-source-repository" append-icon="mdi-chevron-right" @click="router.push(`${organizationBase}/repositories`)" />
+        <v-list-item title="Review skills" subtitle="Understand the effective configuration" prepend-icon="mdi-puzzle-outline" append-icon="mdi-chevron-right" @click="router.push(`${organizationBase}/skills`)" />
       </v-list>
     </SectionCard>
   </div>

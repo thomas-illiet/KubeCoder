@@ -56,7 +56,8 @@ a { color: inherit; }
 .app-bar { background: rgba(13, 17, 23, .96) !important; backdrop-filter: blur(16px); border-bottom: 1px solid #303744 !important; box-shadow: none !important; }
 .org-switcher { letter-spacing: normal; font-weight: 600; }
 .search-trigger { height: 39px !important; min-width: 230px !important; justify-content: flex-start !important; color: #aab3c0 !important; background: #171c24 !important; border-color: #353e4c !important; letter-spacing: 0 !important; }
-.shortcut { font-size: 11px; border: 1px solid rgba(170, 180, 203, .18); padding: 1px 6px; border-radius: 5px; color: #77849c; }
+.search-trigger .v-btn__content { width: 100%; }
+.shortcut { margin-left: auto; font-size: 11px; border: 1px solid rgba(170, 180, 203, .18); padding: 1px 6px; border-radius: 5px; color: #77849c; }
 .user-avatar { width: 39px !important; min-width: 39px !important; height: 39px !important; background: linear-gradient(145deg, #263352, #1c2742) !important; color: #cad2ff !important; font-size: 11px !important; font-weight: 800 !important; }
 
 .auth-layout { background: #0a0d12 !important; }
@@ -246,7 +247,8 @@ a { color: inherit; }
 .form-section { padding: 19px 22px; border-bottom: 1px solid var(--kc-border); }
 .form-section__title { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 700; margin-bottom: 13px; }
 .form-row { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
-.dialog-actions { padding: 14px 20px !important; background: #12171e; border-top: 1px solid #353d49; }
+.dialog-actions { gap: 12px; padding: 18px 28px !important; background: #12171e; border-top: 1px solid #353d49; }
+.dialog-actions .v-btn { min-height: 40px; font-weight: 700; letter-spacing: .035em; }
 .command-dialog { border: 1px solid rgba(124,134,255,.22) !important; background: #0d1424 !important; box-shadow: 0 30px 80px rgba(0,0,0,.5) !important; }
 .command-dialog .v-field { background: transparent !important; }
 .command-empty { display: flex; min-height: 84px; align-items: center; justify-content: center; gap: 9px; color: #66758e; font-size: 12px; }

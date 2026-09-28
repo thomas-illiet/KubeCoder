@@ -4,7 +4,7 @@ Le plan directeur du projet se trouve dans [`Project/README.md`](./Project/READM
 
 ## Prototype du panneau d’administration
 
-Le prototype est une application frontend en Vue 3, TypeScript et Vuetify 3. Les données métier affichées restent fictives, mais l’accès au site utilise une authentification OpenID Connect réelle contre l’instance Keycloak locale décrite dans [`deploy/helm/kubecoder-keycloak`](./deploy/helm/kubecoder-keycloak/README.md).
+Le prototype est une application frontend en Vue 3, TypeScript et Vuetify 3. L’authentification, le profil, les organisations et leurs memberships utilisent le backend réel. Les autres écrans métier contiennent encore des données fictives.
 
 ```sh
 helm upgrade --install kubecoder-auth ./deploy/helm/kubecoder-keycloak \
@@ -36,9 +36,9 @@ Toutes les propriétés sont obligatoires et les URL doivent être absolues. Le
 fichier est chargé avec `cache: no-store` avant l'initialisation OIDC ; une
 configuration absente ou invalide bloque volontairement le démarrage.
 
-L'interface est alors disponible sur `http://localhost:5173/admin`.
+L'interface est alors disponible sur `http://localhost:5173/organization`. Sans membership, elle présente un état vide ; un administrateur plateforme peut créer les organisations et gérer leurs membres dans `/admin/organizations`.
 
-Le compte local est `admin` / `admin`. Le frontend utilise une bibliothèque OIDC générique, le flux Authorization Code avec PKCE S256 et `sessionStorage`; il ne dépend pas de `keycloak-js`. Toutes les routes organisation et administration exigent une session, sans appliquer de rôle ni d’autorisation métier.
+Le compte local est `admin` / `admin`. Le frontend utilise une bibliothèque OIDC générique, le flux Authorization Code avec PKCE S256 et `sessionStorage`; il ne dépend pas de `keycloak-js`. Les routes `/organizations/:slug` exigent un membership et les routes `/admin` exigent le droit administrateur retourné par le backend.
 
 Pour vérifier le build de production :
 

@@ -4,6 +4,7 @@ import { fetchCurrentUser } from './users'
 const user = {
   id: '2c47b281-568b-45a6-9006-2e9ba7237fbc', subject: 'subject', username: 'admin',
   display_name: 'Demo Admin', email: 'admin@kubecoder.local', is_admin: true,
+  preferred_organization: null,
   created_at: '2026-09-28T12:00:00Z', updated_at: '2026-09-28T12:00:00Z',
 }
 

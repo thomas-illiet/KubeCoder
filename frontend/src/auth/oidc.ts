@@ -20,6 +20,8 @@ export interface AuthApi {
   state: DeepReadonly<AuthState>
   isAuthenticated: ComputedRef<boolean>
   isAdmin: ComputedRef<boolean>
+  accessToken: ComputedRef<string>
+  updatePreferredOrganization(organization: CurrentUser['preferred_organization']): void
   initialize(): Promise<void>
   login(returnTo?: string): Promise<void>
   completeLogin(): Promise<string>
@@ -112,6 +114,11 @@ export function createAuth(config: RuntimeConfig, dependencies: AuthDependencies
     state: readonly(state),
     isAuthenticated: computed(() => Boolean(state.user && state.currentUser && !state.user.expired)),
     isAdmin: computed(() => state.currentUser?.is_admin === true),
+    accessToken: computed(() => state.user?.access_token ?? ''),
+
+    updatePreferredOrganization(organization: CurrentUser['preferred_organization']): void {
+      if (state.currentUser) state.currentUser.preferred_organization = organization
+    },
 
     async initialize(): Promise<void> {
       state.loading = true

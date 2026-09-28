@@ -2,6 +2,7 @@ package users
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -46,6 +47,13 @@ func TestCurrentUser(t *testing.T) {
 	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if _, exists := payload["preferred_organization"]; !exists {
+		t.Fatalf("preferred_organization is missing from response: %s", response.Body.String())
 	}
 }
 

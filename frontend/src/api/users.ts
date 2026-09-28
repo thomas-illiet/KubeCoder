@@ -5,6 +5,11 @@ export interface CurrentUser {
   display_name: string
   email: string
   is_admin: boolean
+  preferred_organization: {
+    id: string
+    name: string
+    slug: string
+  } | null
   created_at: string
   updated_at: string
 }
@@ -18,8 +23,17 @@ function isCurrentUser(value: unknown): value is CurrentUser {
     && typeof user.display_name === 'string'
     && typeof user.email === 'string'
     && typeof user.is_admin === 'boolean'
+    && (user.preferred_organization === null || isOrganizationSummary(user.preferred_organization))
     && typeof user.created_at === 'string'
     && typeof user.updated_at === 'string'
+}
+
+function isOrganizationSummary(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const organization = value as Record<string, unknown>
+  return typeof organization.id === 'string'
+    && typeof organization.name === 'string'
+    && typeof organization.slug === 'string'
 }
 
 export async function fetchCurrentUser(apiBaseUrl: string, accessToken: string, fetcher: typeof fetch = fetch): Promise<CurrentUser> {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canShowWorkspaceSwitch } from './navigation'
+import { canShowWorkspaceSwitch, isSearchShortcut } from './navigation'
 
 describe('workspace navigation', () => {
   it('hides administration from non-administrators', () => {
@@ -9,5 +9,11 @@ describe('workspace navigation', () => {
 
   it('always lets users leave the administration layout', () => {
     expect(canShowWorkspaceSwitch('admin', true)).toBe(true)
+  })
+
+  it('recognizes the search shortcut on macOS and other platforms', () => {
+    expect(isSearchShortcut({ key: 'k', metaKey: true, ctrlKey: false })).toBe(true)
+    expect(isSearchShortcut({ key: 'K', metaKey: false, ctrlKey: true })).toBe(true)
+    expect(isSearchShortcut({ key: 'k', metaKey: false, ctrlKey: false })).toBe(false)
   })
 })

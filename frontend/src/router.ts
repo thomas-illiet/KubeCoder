@@ -5,9 +5,11 @@ export const router = createRouter({
   scrollBehavior: () => ({ top: 0 }),
   routes: [
     { path: '/', redirect: '/organization' },
+    { path: '/organization', component: () => import('./views/NoOrganizationView.vue'), meta: { section: 'Organization', title: 'No organization', subtitle: 'Organization access is assigned by a platform administrator' } },
     {
-      path: '/organization',
+      path: '/organizations/:organizationSlug',
       component: () => import('./layouts/OrganizationLayout.vue'),
+      meta: { requiresOrganization: true },
       children: [
         { path: '', component: () => import('./views/OrganizationOverviewView.vue'), meta: { section: 'Organization', title: 'Overview', subtitle: 'Your developer workspace' } },
         { path: 'repositories', component: () => import('./views/RepositoriesView.vue'), meta: { section: 'Organization', title: 'Repositories', subtitle: 'Accessible repositories and agent configuration' } },
@@ -30,7 +32,8 @@ export const router = createRouter({
         { path: 'secrets', component: () => import('./views/SecretsView.vue'), meta: { section: 'Administration', title: 'Secrets', subtitle: 'Protected values, rotations, and bindings' } },
         { path: 'skills', component: () => import('./views/SkillsView.vue'), meta: { section: 'Administration', title: 'Skills', subtitle: 'Catalog and activation policies' } },
         { path: 'mcp', component: () => import('./views/McpServersView.vue'), meta: { section: 'Administration', title: 'MCP servers', subtitle: 'Global catalog and organization tool connectors' } },
-        { path: 'members', component: () => import('./views/MembersView.vue'), meta: { section: 'Administration', title: 'Members', subtitle: 'Organization access and roles' } },
+        { path: 'organizations', component: () => import('./views/admin/OrganizationsView.vue'), meta: { section: 'Administration', title: 'Organizations', subtitle: 'Tenants and membership administration' } },
+        { path: 'organizations/:organizationId', component: () => import('./views/admin/OrganizationDetailView.vue'), meta: { section: 'Organizations', title: 'Organization details', subtitle: 'Membership and organization settings' } },
         { path: 'runtimes', component: () => import('./views/RuntimesView.vue'), meta: { section: 'Administration', title: 'Images & adapters', subtitle: 'Approved runtime supply chain' } },
         { path: 'profile', component: () => import('./views/ProfileView.vue'), meta: { section: 'Account', title: 'Profile', subtitle: 'Personal information and account preferences' } },
       ],

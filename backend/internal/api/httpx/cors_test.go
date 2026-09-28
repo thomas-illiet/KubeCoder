@@ -20,4 +20,7 @@ func TestCORSPreflightForConfiguredFrontend(t *testing.T) {
 	if got := response.Header().Get("Access-Control-Allow-Origin"); got != "http://localhost:5173" {
 		t.Fatalf("allow origin = %q", got)
 	}
+	if got := response.Header().Get("Access-Control-Allow-Methods"); got != "GET, POST, PUT, PATCH, DELETE, OPTIONS" {
+		t.Fatalf("allow methods = %q", got)
+	}
 }

@@ -12,6 +12,7 @@ import { createAuth, installAuth } from './auth/oidc'
 import { installAuthGuard } from './auth/guard'
 import { router } from './router'
 import { loadRuntimeConfig } from './runtime/config'
+import { createOrganizationService, installOrganizations } from './organizations/service'
 
 const vuetify = createVuetify({
   components,
@@ -27,7 +28,8 @@ const vuetify = createVuetify({
           'surface-bright': '#252c38',
           primary: '#8193ff',
           secondary: '#55c8bc',
-          success: '#31d49d',
+          success: '#58b7a7',
+          'on-success': '#071a18',
           warning: '#e9ad5a',
           error: '#fb7185',
           info: '#60a5fa',
@@ -48,12 +50,18 @@ async function bootstrap() {
   const config = await loadRuntimeConfig()
   const auth = createAuth(config)
   await auth.initialize()
-  installAuthGuard(router, auth)
+  const organizations = createOrganizationService(config, auth)
+  await organizations.initialize()
+  installAuthGuard(router, auth, organizations)
   watch(auth.isAuthenticated, (authenticated, wasAuthenticated) => {
-    if (wasAuthenticated && !authenticated) void router.replace('/login')
+    if (wasAuthenticated && !authenticated) {
+      organizations.reset()
+      void router.replace('/login')
+    }
   })
   const app = createApp(App).component('IconSelect', IconSelect).use(router).use(vuetify)
   installAuth(app, auth)
+  installOrganizations(app, organizations)
   app.mount('#app')
 }
 
