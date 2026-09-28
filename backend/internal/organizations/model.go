@@ -14,8 +14,9 @@ type Organization = models.Organization
 
 // OrganizationSummary augments an organization with administration-only aggregate data.
 type OrganizationSummary struct {
-	Organization `gorm:"embedded"`
-	MemberCount  int64 `gorm:"column:member_count" json:"member_count"`
+	Organization    `gorm:"embedded"`
+	MemberCount     int64 `gorm:"column:member_count" json:"member_count"`
+	RepositoryCount int64 `gorm:"column:repository_count" json:"repository_count"`
 }
 
 // Membership grants a user access to an organization.

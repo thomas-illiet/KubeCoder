@@ -74,4 +74,19 @@ describe('organization context', () => {
     expect(auth.state.currentUser?.preferred_organization?.id).toBe(organization.id)
     expect(fetcher.mock.calls[1]?.[0]).toBe('http://api.test/api/v1/organizations/northstar-labs/preferred')
   })
+
+  it('refreshes the organization context after assigning the current user', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ items: [organization], total: 1, limit: 100, offset: 0 })))
+      .mockResolvedValueOnce(new Response(JSON.stringify(organization)))
+    const auth = fakeAuth()
+    const service = createOrganizationService(config, auth, fetcher)
+
+    await service.addMember(organization.id, auth.state.currentUser!.id)
+
+    expect(service.state.items).toEqual([organization])
+    expect(service.state.current?.id).toBe(organization.id)
+    expect(fetcher.mock.calls[1]?.[0]).toBe('http://api.test/api/v1/organizations?limit=100')
+  })
 })

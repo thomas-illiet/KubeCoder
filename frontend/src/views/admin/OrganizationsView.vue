@@ -19,8 +19,9 @@ const loading = shallowRef(false)
 const formOpen = shallowRef(false)
 const page = shallowRef(1)
 const total = shallowRef(0)
+const repositoryTotal = shallowRef(0)
 const itemsPerPage = 20
-type SortKey = 'name' | 'created_at' | 'member_count'
+type SortKey = 'name' | 'created_at' | 'member_count' | 'repository_count'
 type SortDirection = 'asc' | 'desc'
 const sortBy = shallowRef<SortKey>('name')
 const sortDirection = shallowRef<SortDirection>('asc')
@@ -40,6 +41,7 @@ async function loadOrganizations(revision = ++loadRevision): Promise<void> {
     if (revision !== loadRevision) return
     items.value = result.items ?? []
     total.value = result.total
+    repositoryTotal.value = result.repository_total
   } catch (error) {
     if (revision === loadRevision) notifications.error('Organizations could not be loaded', error instanceof Error ? error.message : undefined)
   } finally {
@@ -106,7 +108,7 @@ onMounted(() => void loadOrganizations())
     <v-spacer />
     <v-btn color="success" variant="flat" prepend-icon="mdi-domain-plus" @click="openCreate">Create organization</v-btn>
   </FilterCard>
-  <SectionCard title="Platform organizations" :subtitle="`${total} organizations`">
+  <SectionCard title="Platform organizations" :subtitle="`${total} organizations · ${repositoryTotal} repositories`">
     <div class="organization-table-shell" :aria-busy="loading">
       <v-progress-linear v-if="loading" class="organization-table-progress" indeterminate color="primary" />
       <div class="table-scroll organization-table-content" :class="{ 'organization-table-content--loading': loading }">
@@ -116,13 +118,14 @@ onMounted(() => void loadOrganizations())
             <th :aria-sort="ariaSort('name')"><button class="sort-header" type="button" @click="changeSort('name')">ORGANIZATION<v-icon :icon="sortBy === 'name' ? (sortDirection === 'asc' ? 'mdi-arrow-up' : 'mdi-arrow-down') : 'mdi-unfold-more-horizontal'" size="16" /></button></th>
             <th :aria-sort="ariaSort('created_at')"><button class="sort-header" type="button" @click="changeSort('created_at')">CREATED<v-icon :icon="sortBy === 'created_at' ? (sortDirection === 'asc' ? 'mdi-arrow-up' : 'mdi-arrow-down') : 'mdi-unfold-more-horizontal'" size="16" /></button></th>
             <th :aria-sort="ariaSort('member_count')"><button class="sort-header" type="button" @click="changeSort('member_count')">MEMBERS<v-icon :icon="sortBy === 'member_count' ? (sortDirection === 'asc' ? 'mdi-arrow-up' : 'mdi-arrow-down') : 'mdi-unfold-more-horizontal'" size="16" /></button></th>
+            <th :aria-sort="ariaSort('repository_count')"><button class="sort-header" type="button" @click="changeSort('repository_count')">REPOSITORIES<v-icon :icon="sortBy === 'repository_count' ? (sortDirection === 'asc' ? 'mdi-arrow-up' : 'mdi-arrow-down') : 'mdi-unfold-more-horizontal'" size="16" /></button></th>
             <th><span class="sr-only">Open</span></th>
           </tr>
         </thead>
         <tbody>
           <DataTableEmptyRow
             v-if="!loading && items.length === 0"
-            :colspan="4"
+            :colspan="5"
             title="No organizations found"
             description="Create an organization or adjust your search to display results."
             icon="mdi-domain-off"
@@ -131,6 +134,7 @@ onMounted(() => void loadOrganizations())
             <td><div class="d-flex align-center py-3"><div class="org-avatar mr-3">{{ organization.name.slice(0, 2).toUpperCase() }}</div><div><div class="font-weight-medium">{{ organization.name }}</div><div class="text-caption text-medium-emphasis">{{ organization.slug }}</div></div></div></td>
             <td>{{ formatCreatedAt(organization.created_at) }}</td>
             <td>{{ organization.member_count }}</td>
+            <td>{{ organization.repository_count }}</td>
             <td class="text-right"><v-icon icon="mdi-chevron-right" aria-hidden="true" /></td>
           </tr>
         </tbody>

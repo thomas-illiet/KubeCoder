@@ -11,6 +11,7 @@ import {
   removeOrganizationMember,
   renameOrganization,
   type AdminOrganization,
+  type AdminOrganizationPage,
   type Organization,
   type OrganizationInput,
   type OrganizationMember,
@@ -38,7 +39,7 @@ export interface OrganizationApi {
   select(slug: string): Promise<Organization>
   hasMembership(slug: string): boolean
   reset(): void
-  listAdmin(options?: PageRequest): Promise<Page<AdminOrganization>>
+  listAdmin(options?: PageRequest): Promise<AdminOrganizationPage>
   create(input: OrganizationInput): Promise<Organization>
   rename(id: string, name: string): Promise<Organization>
   remove(id: string): Promise<void>
@@ -64,7 +65,23 @@ export function createOrganizationService(config: RuntimeConfig, auth: AuthApi, 
     const [baseURL, token] = credentials()
     const result = await fetchOrganizations(baseURL, token, '', fetcher)
     state.items = result.items ?? []
-    if (state.current && !state.items.some((item) => item.id === state.current?.id)) state.current = null
+    const current = state.current ? state.items.find((item) => item.id === state.current?.id) : undefined
+    if (current) {
+      state.current = current
+      return
+    }
+
+    const preferredID = auth.state.currentUser?.preferred_organization?.id
+    const preferred = preferredID ? state.items.find((item) => item.id === preferredID) : undefined
+    if (preferred) {
+      state.current = preferred
+      return
+    }
+
+    state.current = null
+    if (state.items.length > 0) {
+      await select([...state.items].sort((a, b) => a.name.localeCompare(b.name))[0].slug)
+    }
   }
 
   async function select(slug: string): Promise<Organization> {
@@ -86,10 +103,6 @@ export function createOrganizationService(config: RuntimeConfig, auth: AuthApi, 
         return
       }
       await refresh()
-      const preferred = auth.state.currentUser?.preferred_organization
-      const selected = preferred ? state.items.find((item) => item.id === preferred.id) : undefined
-      if (selected) state.current = selected
-      else if (state.items.length > 0) await select([...state.items].sort((a, b) => a.name.localeCompare(b.name))[0].slug)
     } catch (error) {
       state.error = error instanceof Error ? error.message : 'Organizations could not be loaded.'
       throw error
@@ -121,8 +134,16 @@ export function createOrganizationService(config: RuntimeConfig, auth: AuthApi, 
     remove: (id) => { const [url, token] = credentials(); return deleteOrganization(url, token, id, fetcher) },
     listMembers: (id, options = {}) => { const [url, token] = credentials(); return fetchOrganizationMembers(url, token, id, options, fetcher) },
     listUsers: (query) => { const [url, token] = credentials(); return fetchProvisionedUsers(url, token, query, fetcher) },
-    addMember: (organizationID, userID) => { const [url, token] = credentials(); return addOrganizationMember(url, token, organizationID, userID, fetcher) },
-    removeMember: (organizationID, userID) => { const [url, token] = credentials(); return removeOrganizationMember(url, token, organizationID, userID, fetcher) },
+    addMember: async (organizationID, userID) => {
+      const [url, token] = credentials()
+      await addOrganizationMember(url, token, organizationID, userID, fetcher)
+      if (userID === auth.state.currentUser?.id) await refresh()
+    },
+    removeMember: async (organizationID, userID) => {
+      const [url, token] = credentials()
+      await removeOrganizationMember(url, token, organizationID, userID, fetcher)
+      if (userID === auth.state.currentUser?.id) await refresh()
+    },
   }
 }
 

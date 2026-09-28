@@ -1,3 +1,6 @@
-h1:ndYno5NFESVgmY1+qxXZCnnzhjY2xJt76ZpVp4cl+Is=
+h1:mLRItBSl495oSmb27wLEJRaysUxhbqnOr5tDHZrIr4w=
 000001_create_users.up.sql h1:xhnNNbGP994nY8a90X7woIUYcY3+yjpQi+vmmcNoK34=
 20260928101656_add_organizations.up.sql h1:8TImOc/sD6qDaLmN0lWui85fkS1B4JGwMGHYe6xWd/Q=
+20260928165702_add_agents_repositories.up.sql h1:lRmOTa/RaLyD0b5yEN5hXwnQDJn9eTKn8+w3SHua0Zk=
+20260928183816_add_organization_ssh_keys.up.sql h1:A16/NmCxRD1xtv3aTb8+wi6lCzEwZdfSpB8WoHVEk9w=
+20260928190500_repair_user_admin_column.up.sql h1:jD/CzAjNA1J0slrEWHtrQ6CqsFGnZzMkipvZOsls50U=

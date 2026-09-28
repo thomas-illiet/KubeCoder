@@ -7,9 +7,12 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/api/httpx"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/auth"
+	"github.com/thomas-illiet/KubeCoder/backend/internal/models"
 	domain "github.com/thomas-illiet/KubeCoder/backend/internal/organizations"
+	"github.com/thomas-illiet/KubeCoder/backend/internal/sshkeys"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/users"
 )
 
@@ -25,17 +28,24 @@ type Service interface {
 	SetPreferred(context.Context, users.User, string) (domain.Organization, error)
 }
 
+// SSHKeyService exposes organization SSH key public metadata and rotation.
+type SSHKeyService interface {
+	Get(context.Context, uuid.UUID) (models.OrganizationSSHKey, error)
+	Regenerate(context.Context, uuid.UUID) (models.OrganizationSSHKey, error)
+}
+
 // Handler serves the authenticated organization API category.
 type Handler struct {
 	logger   *slog.Logger
 	verifier auth.Verifier
 	users    UserService
 	service  Service
+	sshKeys  SSHKeyService
 }
 
 // NewHandler creates an authenticated organization API handler.
-func NewHandler(logger *slog.Logger, verifier auth.Verifier, users UserService, service Service) *Handler {
-	return &Handler{logger: logger, verifier: verifier, users: users, service: service}
+func NewHandler(logger *slog.Logger, verifier auth.Verifier, users UserService, service Service, sshKeys SSHKeyService) *Handler {
+	return &Handler{logger: logger, verifier: verifier, users: users, service: service, sshKeys: sshKeys}
 }
 
 // RegisterRoutes registers endpoints for the organization API category.
@@ -43,6 +53,46 @@ func RegisterRoutes(mux *http.ServeMux, handler *Handler) {
 	mux.HandleFunc("GET /api/v1/organizations", handler.list)
 	mux.HandleFunc("GET /api/v1/organizations/{slug}", handler.get)
 	mux.HandleFunc("PUT /api/v1/organizations/{slug}/preferred", handler.prefer)
+	mux.HandleFunc("GET /api/v1/organizations/{slug}/ssh-key", handler.getSSHKey)
+	mux.HandleFunc("POST /api/v1/organizations/{slug}/ssh-key/regenerate", handler.regenerateSSHKey)
+}
+
+// getSSHKey returns only the public SSH identity to an organization member.
+func (h *Handler) getSSHKey(w http.ResponseWriter, r *http.Request) {
+	h.withOrganizationSSHKey(w, r, false)
+}
+
+// regenerateSSHKey atomically creates a missing identity or replaces an existing one.
+func (h *Handler) regenerateSSHKey(w http.ResponseWriter, r *http.Request) {
+	h.withOrganizationSSHKey(w, r, true)
+}
+
+// withOrganizationSSHKey checks membership before reading or rotating public key metadata.
+func (h *Handler) withOrganizationSSHKey(w http.ResponseWriter, r *http.Request, regenerate bool) {
+	actor, ok := h.actor(w, r)
+	if !ok {
+		return
+	}
+	organization, err := h.service.GetForUser(r.Context(), actor, r.PathValue("slug"))
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	var key models.OrganizationSSHKey
+	if regenerate {
+		key, err = h.sshKeys.Regenerate(r.Context(), organization.ID)
+	} else {
+		key, err = h.sshKeys.Get(r.Context(), organization.ID)
+	}
+	if errors.Is(err, sshkeys.ErrNotFound) {
+		httpx.WriteProblem(w, r, http.StatusNotFound, "Not Found", "This organization does not have an SSH key yet.")
+		return
+	}
+	if err != nil {
+		h.internalError(w, r, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, key)
 }
 
 // list returns organizations accessible to the current user.

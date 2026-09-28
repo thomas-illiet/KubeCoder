@@ -62,8 +62,13 @@ externalDatabase:
   dsnSecretName: ""
   dsnSecretKey: dsn
 
+security:
+  organizationSSHKeys:
+    existingSecret: ""
+    encryptionKeySecretKey: encryption-key
+
 migration:
-  expectedVersion: "20260928101656"
+  expectedVersion: "20260928190500"
   waitTimeout: 5m
   ttlSecondsAfterFinished: 600
   backoffLimit: 3

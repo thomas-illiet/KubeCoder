@@ -2,6 +2,10 @@
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
+{{- define "kubecoder.organizationSSHKeySecretName" -}}
+{{- required "security.organizationSSHKeys.existingSecret is required" .Values.security.organizationSSHKeys.existingSecret -}}
+{{- end }}
+
 {{- define "kubecoder.fullname" -}}
 {{- if .Values.fullnameOverride }}{{ .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}{{ else }}{{ printf "%s-%s" .Release.Name (include "kubecoder.name" .) | trunc 63 | trimSuffix "-" }}{{ end }}
 {{- end }}

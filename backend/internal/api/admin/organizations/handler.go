@@ -25,6 +25,7 @@ type UserService interface {
 // Service defines organization administration operations required by the handler.
 type Service interface {
 	List(context.Context, users.User, string, int, int, string, string) ([]domain.OrganizationSummary, int64, error)
+	CountRepositories(context.Context, users.User) (int64, error)
 	Create(context.Context, users.User, string, string) (domain.Organization, error)
 	Get(context.Context, users.User, uuid.UUID) (domain.Organization, error)
 	Rename(context.Context, users.User, uuid.UUID, string) (domain.Organization, error)
@@ -89,7 +90,16 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, r, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, httpx.NewPage(items, total, pagination))
+	repositoryTotal, err := h.service.CountRepositories(r.Context(), actor)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	page := httpx.NewPage(items, total, pagination)
+	httpx.WriteJSON(w, http.StatusOK, struct {
+		httpx.Page[domain.OrganizationSummary]
+		RepositoryTotal int64 `json:"repository_total"`
+	}{Page: page, RepositoryTotal: repositoryTotal})
 }
 
 // create validates and creates an organization.

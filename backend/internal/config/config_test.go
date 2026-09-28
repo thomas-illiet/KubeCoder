@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,6 +17,21 @@ func TestLoadRejectsUnknownKeys(t *testing.T) {
 	}
 	if _, err := Load(path, nil); err == nil {
 		t.Fatal("expected unknown configuration key to fail")
+	}
+}
+
+// TestOrganizationSSHKeyEncryptionKey verifies strict base64 and AES-256 key validation.
+func TestOrganizationSSHKeyEncryptionKey(t *testing.T) {
+	t.Parallel()
+	encoded := base64.StdEncoding.EncodeToString(make([]byte, 32))
+	key, err := (Config{Security: SecurityConfig{OrganizationSSHKeyEncryptionKey: encoded}}).OrganizationSSHKeyEncryptionKey()
+	if err != nil || len(key) != 32 {
+		t.Fatalf("key = %d bytes, error = %v", len(key), err)
+	}
+	for _, invalid := range []string{"", "not-base64", base64.StdEncoding.EncodeToString(make([]byte, 31))} {
+		if _, err := (Config{Security: SecurityConfig{OrganizationSSHKeyEncryptionKey: invalid}}).OrganizationSSHKeyEncryptionKey(); err == nil {
+			t.Fatalf("expected %q to be rejected", invalid)
+		}
 	}
 }
 

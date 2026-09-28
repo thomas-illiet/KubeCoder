@@ -10,6 +10,11 @@ export interface Organization {
 
 export interface AdminOrganization extends Organization {
   member_count: number
+  repository_count: number
+}
+
+export interface AdminOrganizationPage extends Page<AdminOrganization> {
+  repository_total: number
 }
 
 export interface OrganizationMember extends CurrentUser {
@@ -32,7 +37,7 @@ export interface PageRequest {
   query?: string
   limit?: number
   offset?: number
-  orderBy?: 'name' | 'created_at' | 'member_count'
+  orderBy?: 'name' | 'created_at' | 'member_count' | 'repository_count'
   orderDirection?: 'asc' | 'desc'
 }
 
@@ -76,7 +81,7 @@ export function preferOrganization(apiBaseUrl: string, token: string, slug: stri
 }
 
 // fetchAdminOrganizations returns one bounded organization page to a platform administrator.
-export function fetchAdminOrganizations(apiBaseUrl: string, token: string, options: PageRequest = {}, fetcher: typeof fetch = fetch): Promise<Page<AdminOrganization>> {
+export function fetchAdminOrganizations(apiBaseUrl: string, token: string, options: PageRequest = {}, fetcher: typeof fetch = fetch): Promise<AdminOrganizationPage> {
   const parameters = new URLSearchParams({
     limit: String(options.limit ?? 20),
     offset: String(options.offset ?? 0),

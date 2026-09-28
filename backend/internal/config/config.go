@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -15,7 +16,12 @@ type Config struct {
 	HTTP     HTTPConfig     `mapstructure:"http"`
 	Database DatabaseConfig `mapstructure:"database"`
 	OIDC     OIDCConfig     `mapstructure:"oidc"`
+	Security SecurityConfig `mapstructure:"security"`
 	Log      LogConfig      `mapstructure:"log"`
+}
+
+type SecurityConfig struct {
+	OrganizationSSHKeyEncryptionKey string `mapstructure:"organization_ssh_key_encryption_key"`
 }
 
 type HTTPConfig struct {
@@ -68,6 +74,7 @@ func Load(configFile string, flags *pflag.FlagSet) (Config, error) {
 		"http.address", "http.read_timeout", "http.write_timeout", "http.idle_timeout", "http.shutdown_timeout", "http.allowed_origins",
 		"database.dsn", "database.max_open_conns", "database.max_idle_conns", "database.conn_max_lifetime",
 		"oidc.issuer", "oidc.discovery_url", "oidc.audience", "oidc.timeout", "log.level", "log.format",
+		"security.organization_ssh_key_encryption_key",
 	} {
 		if err := v.BindEnv(key); err != nil {
 			return Config{}, fmt.Errorf("bind environment variable for %s: %w", key, err)
@@ -99,6 +106,16 @@ func Load(configFile string, flags *pflag.FlagSet) (Config, error) {
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+// OrganizationSSHKeyEncryptionKey decodes and validates the required AES-256 master key.
+func (c Config) OrganizationSSHKeyEncryptionKey() ([]byte, error) {
+	value := strings.TrimSpace(c.Security.OrganizationSSHKeyEncryptionKey)
+	key, err := base64.StdEncoding.Strict().DecodeString(value)
+	if err != nil || len(key) != 32 {
+		return nil, errors.New("security.organization_ssh_key_encryption_key must be base64 encoding exactly 32 bytes")
+	}
+	return key, nil
 }
 
 // setDefaults registers default values with a Viper instance.

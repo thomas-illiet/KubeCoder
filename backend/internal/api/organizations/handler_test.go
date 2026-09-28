@@ -6,12 +6,15 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/api/httpx"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/auth"
+	"github.com/thomas-illiet/KubeCoder/backend/internal/models"
 	domain "github.com/thomas-illiet/KubeCoder/backend/internal/organizations"
+	"github.com/thomas-illiet/KubeCoder/backend/internal/sshkeys"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/users"
 )
 
@@ -30,6 +33,21 @@ func (f fakeUsers) Current(context.Context, auth.Identity) (users.User, error) {
 type fakeOrganizations struct {
 	preferred domain.Organization
 	err       error
+}
+
+type fakeSSHKeys struct {
+	key models.OrganizationSSHKey
+	err error
+}
+
+// Get returns the configured SSH key response.
+func (f fakeSSHKeys) Get(context.Context, uuid.UUID) (models.OrganizationSSHKey, error) {
+	return f.key, f.err
+}
+
+// Regenerate returns the configured SSH key rotation response.
+func (f fakeSSHKeys) Regenerate(context.Context, uuid.UUID) (models.OrganizationSSHKey, error) {
+	return f.key, f.err
 }
 
 // ListForUser returns the configured organization page.
@@ -51,7 +69,7 @@ func (f fakeOrganizations) SetPreferred(context.Context, users.User, string) (do
 func testHandler(service Service) http.Handler {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	mux := http.NewServeMux()
-	RegisterRoutes(mux, NewHandler(logger, fakeVerifier{}, fakeUsers{current: users.User{ID: uuid.New()}}, service))
+	RegisterRoutes(mux, NewHandler(logger, fakeVerifier{}, fakeUsers{current: users.User{ID: uuid.New()}}, service, fakeSSHKeys{}))
 	return httpx.Middleware(logger, mux)
 }
 
@@ -74,6 +92,83 @@ func TestOrganizationMembershipIsRequired(t *testing.T) {
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/organizations/private", nil)
 	request.Header.Set("Authorization", "Bearer token")
 	response := httptest.NewRecorder()
+	testHandler(fakeOrganizations{err: domain.ErrForbidden}).ServeHTTP(response, request)
+	if response.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+}
+
+// TestGetSSHKeyReturnsOnlyPublicMetadata verifies protected columns never reach the response.
+func TestGetSSHKeyReturnsOnlyPublicMetadata(t *testing.T) {
+	t.Parallel()
+	organization := domain.Organization{ID: uuid.New(), Slug: "northstar-labs"}
+	key := models.OrganizationSSHKey{
+		OrganizationID: organization.ID, PublicKey: "ssh-ed25519 public", Fingerprint: "SHA256:test", KeyAlgorithm: "ssh-ed25519",
+		EncryptedPrivateKey: []byte("private-ciphertext"), Nonce: []byte("secret-nonce"), EncryptionVersion: "aes-256-gcm-v1",
+	}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, NewHandler(logger, fakeVerifier{}, fakeUsers{current: users.User{ID: uuid.New()}}, fakeOrganizations{preferred: organization}, fakeSSHKeys{key: key}))
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/organizations/northstar-labs/ssh-key", nil)
+	request.Header.Set("Authorization", "Bearer token")
+	response := httptest.NewRecorder()
+	httpx.Middleware(logger, mux).ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	for _, forbidden := range []string{"private-ciphertext", "secret-nonce", "encryption_version", "organization_id"} {
+		if strings.Contains(response.Body.String(), forbidden) {
+			t.Fatalf("response leaks %q: %s", forbidden, response.Body.String())
+		}
+	}
+}
+
+// TestGetSSHKeyNotFound verifies legacy organizations receive an actionable empty state.
+func TestGetSSHKeyNotFound(t *testing.T) {
+	t.Parallel()
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, NewHandler(logger, fakeVerifier{}, fakeUsers{current: users.User{ID: uuid.New()}}, fakeOrganizations{preferred: domain.Organization{ID: uuid.New()}}, fakeSSHKeys{err: sshkeys.ErrNotFound}))
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/organizations/legacy/ssh-key", nil)
+	request.Header.Set("Authorization", "Bearer token")
+	response := httptest.NewRecorder()
+	httpx.Middleware(logger, mux).ServeHTTP(response, request)
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+}
+
+// TestRegenerateSSHKeyNotFound verifies rotation never creates a missing initial key.
+func TestRegenerateSSHKeyNotFound(t *testing.T) {
+	t.Parallel()
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, NewHandler(logger, fakeVerifier{}, fakeUsers{current: users.User{ID: uuid.New()}}, fakeOrganizations{preferred: domain.Organization{ID: uuid.New()}}, fakeSSHKeys{err: sshkeys.ErrNotFound}))
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/organizations/current/ssh-key/regenerate", nil)
+	request.Header.Set("Authorization", "Bearer token")
+	response := httptest.NewRecorder()
+	httpx.Middleware(logger, mux).ServeHTTP(response, request)
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+}
+
+// TestSSHKeyRequiresAuthentication verifies anonymous key reads are rejected.
+func TestSSHKeyRequiresAuthentication(t *testing.T) {
+	t.Parallel()
+	response := httptest.NewRecorder()
+	testHandler(fakeOrganizations{}).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/v1/organizations/northstar/ssh-key", nil))
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+}
+
+// TestSSHKeyRequiresOrganizationMembership verifies one tenant cannot read another tenant's key.
+func TestSSHKeyRequiresOrganizationMembership(t *testing.T) {
+	t.Parallel()
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/organizations/private/ssh-key", nil)
+	request.Header.Set("Authorization", "Bearer token")
 	testHandler(fakeOrganizations{err: domain.ErrForbidden}).ServeHTTP(response, request)
 	if response.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())

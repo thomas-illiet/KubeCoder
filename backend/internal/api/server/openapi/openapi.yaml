@@ -14,6 +14,10 @@ tags:
     description: Administrative organization and membership management.
   - name: User administration
     description: Administrative access to provisioned users.
+  - name: Agent administration
+    description: Platform-managed agent definitions.
+  - name: Repositories
+    description: Organization repository configuration and public agent catalog.
   - name: System
     description: Service health and readiness.
 paths:
@@ -82,6 +86,39 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Organization' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/organizations/{slug}/ssh-key:
+    parameters:
+      - { $ref: '#/components/parameters/OrganizationSlug' }
+    get:
+      tags: [Organizations]
+      operationId: getOrganizationSSHKey
+      summary: Return the organization public SSH key
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Organization public SSH key
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrganizationSSHKey' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/organizations/{slug}/ssh-key/regenerate:
+    parameters:
+      - { $ref: '#/components/parameters/OrganizationSlug' }
+    post:
+      tags: [Organizations]
+      operationId: regenerateOrganizationSSHKey
+      summary: Create a missing organization SSH key pair or replace the existing pair
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Generated organization public SSH key
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrganizationSSHKey' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
   /api/v1/admin/organizations:
@@ -246,6 +283,126 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/UserPage' }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/admin/agents:
+    get:
+      tags: [Agent administration]
+      operationId: listAgents
+      summary: List full agent definitions
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/Query' }
+        - { $ref: '#/components/parameters/Limit' }
+        - { $ref: '#/components/parameters/Offset' }
+        - { name: active, in: query, schema: { type: boolean } }
+      responses:
+        '200': { description: Agent page, content: { application/json: { schema: { $ref: '#/components/schemas/AgentPage' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Agent administration]
+      operationId: createAgent
+      summary: Create an agent definition
+      security: [{ bearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AgentInput' } } } }
+      responses:
+        '201': { description: Created agent, content: { application/json: { schema: { $ref: '#/components/schemas/Agent' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/admin/agents/{id}:
+    parameters: [{ $ref: '#/components/parameters/ResourceID' }]
+    get:
+      tags: [Agent administration]
+      operationId: getAgent
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Agent definition, content: { application/json: { schema: { $ref: '#/components/schemas/Agent' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Agent administration]
+      operationId: updateAgent
+      security: [{ bearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AgentInput' } } } }
+      responses:
+        '200': { description: Updated agent, content: { application/json: { schema: { $ref: '#/components/schemas/Agent' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [Agent administration]
+      operationId: deleteAgent
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: Agent deleted }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/organizations/{slug}/agents:
+    parameters: [{ $ref: '#/components/parameters/OrganizationSlug' }]
+    get:
+      tags: [Repositories]
+      operationId: listOrganizationAgents
+      summary: List active public agents available to an organization member
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/Query' }
+        - { $ref: '#/components/parameters/Limit' }
+        - { $ref: '#/components/parameters/Offset' }
+      responses:
+        '200': { description: Public agent page, content: { application/json: { schema: { $ref: '#/components/schemas/PublicAgentPage' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/organizations/{slug}/repositories:
+    parameters: [{ $ref: '#/components/parameters/OrganizationSlug' }]
+    get:
+      tags: [Repositories]
+      operationId: listRepositories
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/Query' }
+        - { $ref: '#/components/parameters/Limit' }
+        - { $ref: '#/components/parameters/Offset' }
+        - { name: provider, in: query, schema: { $ref: '#/components/schemas/GitProvider' } }
+        - { name: configured, in: query, schema: { type: boolean } }
+        - { name: agent_id, in: query, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Repository page, content: { application/json: { schema: { $ref: '#/components/schemas/RepositoryPage' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Repositories]
+      operationId: createRepository
+      security: [{ bearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/RepositoryInput' } } } }
+      responses:
+        '201': { description: Created repository, content: { application/json: { schema: { $ref: '#/components/schemas/Repository' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/organizations/{slug}/repositories/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/OrganizationSlug' }
+      - { $ref: '#/components/parameters/ResourceID' }
+    get:
+      tags: [Repositories]
+      operationId: getRepository
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Repository, content: { application/json: { schema: { $ref: '#/components/schemas/Repository' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Repositories]
+      operationId: updateRepository
+      security: [{ bearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/RepositoryInput' } } } }
+      responses:
+        '200': { description: Updated repository, content: { application/json: { schema: { $ref: '#/components/schemas/Repository' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [Repositories]
+      operationId: deleteRepository
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: Repository deleted }
+        '404': { $ref: '#/components/responses/NotFound' }
   /healthz:
     get:
       tags: [System]
@@ -279,7 +436,7 @@ components:
     OrganizationOrderBy:
       name: order_by
       in: query
-      schema: { type: string, enum: [name, created_at, member_count], default: name }
+      schema: { type: string, enum: [name, created_at, member_count, repository_count], default: name }
     MemberOrderBy:
       name: order_by
       in: query
@@ -298,6 +455,11 @@ components:
       in: path
       required: true
       schema: { type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$' }
+    ResourceID:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
   securitySchemes:
     bearerAuth:
       type: http
@@ -352,16 +514,27 @@ components:
         total: { type: integer, format: int64 }
         limit: { type: integer }
         offset: { type: integer }
+    OrganizationSSHKey:
+      type: object
+      description: Public metadata for an organization's encrypted SSH identity. Private key material is never returned.
+      required: [public_key, fingerprint, algorithm, created_at, updated_at]
+      properties:
+        public_key: { type: string, pattern: '^ssh-ed25519 ' }
+        fingerprint: { type: string, pattern: '^SHA256:' }
+        algorithm: { type: string, enum: [ssh-ed25519] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
     AdminOrganization:
       allOf:
         - { $ref: '#/components/schemas/Organization' }
         - type: object
-          required: [member_count]
+          required: [member_count, repository_count]
           properties:
             member_count: { type: integer, format: int64, minimum: 0 }
+            repository_count: { type: integer, format: int64, minimum: 0 }
     AdminOrganizationPage:
       type: object
-      required: [items, total, limit, offset]
+      required: [items, total, limit, offset, repository_total]
       properties:
         items:
           type: array
@@ -369,6 +542,7 @@ components:
         total: { type: integer, format: int64 }
         limit: { type: integer }
         offset: { type: integer }
+        repository_total: { type: integer, format: int64, minimum: 0 }
     UserPage:
       type: object
       required: [items, total, limit, offset]
@@ -393,6 +567,94 @@ components:
         items:
           type: array
           items: { $ref: '#/components/schemas/OrganizationMember' }
+        total: { type: integer, format: int64 }
+        limit: { type: integer }
+        offset: { type: integer }
+    GitProvider:
+      type: string
+      enum: [github, gitlab, bitbucket]
+    PublicAgent:
+      type: object
+      required: [id, name, description, capabilities, active]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        capabilities: { type: array, items: { type: string } }
+        active: { type: boolean }
+    AgentInput:
+      type: object
+      required: [name, description, runtime_adapter, runtime_version, image, provider, model, system_prompt, capabilities, cpu_millis, memory_mb, storage_mb, max_duration_seconds, active]
+      properties:
+        name: { type: string, maxLength: 120 }
+        description: { type: string, maxLength: 1000 }
+        runtime_adapter: { type: string }
+        runtime_version: { type: string }
+        image: { type: string }
+        provider: { type: string }
+        model: { type: string }
+        system_prompt: { type: string }
+        capabilities: { type: array, items: { type: string } }
+        cpu_millis: { type: integer, minimum: 1 }
+        memory_mb: { type: integer, minimum: 1 }
+        storage_mb: { type: integer, minimum: 1 }
+        max_duration_seconds: { type: integer, minimum: 1 }
+        active: { type: boolean }
+      additionalProperties: false
+    Agent:
+      allOf:
+        - { $ref: '#/components/schemas/AgentInput' }
+        - type: object
+          required: [id, created_at, updated_at]
+          properties:
+            id: { type: string, format: uuid }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+    AgentPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Agent' } }
+        total: { type: integer, format: int64 }
+        limit: { type: integer }
+        offset: { type: integer }
+    PublicAgentPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/PublicAgent' } }
+        total: { type: integer, format: int64 }
+        limit: { type: integer }
+        offset: { type: integer }
+    RepositoryInput:
+      type: object
+      required: [name, provider, clone_url, default_branch, include_submodules]
+      properties:
+        name: { type: string, maxLength: 120 }
+        provider: { $ref: '#/components/schemas/GitProvider' }
+        clone_url: { type: string }
+        default_branch: { type: string, maxLength: 255 }
+        include_submodules: { type: boolean }
+        agent_id: { type: string, format: uuid, nullable: true }
+      additionalProperties: false
+    Repository:
+      allOf:
+        - { $ref: '#/components/schemas/RepositoryInput' }
+        - type: object
+          required: [id, organization_id, agent, created_at, updated_at]
+          properties:
+            id: { type: string, format: uuid }
+            organization_id: { type: string, format: uuid }
+            agent:
+              allOf: [{ $ref: '#/components/schemas/PublicAgent' }]
+              nullable: true
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+    RepositoryPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Repository' } }
         total: { type: integer, format: int64 }
         limit: { type: integer }
         offset: { type: integer }

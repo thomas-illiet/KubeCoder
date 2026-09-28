@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/thomas-illiet/KubeCoder/backend/internal/models"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/users"
 )
 
@@ -15,9 +16,10 @@ var slugPattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 type OrganizationOrder string
 
 const (
-	OrganizationOrderName        OrganizationOrder = "name"
-	OrganizationOrderCreatedAt   OrganizationOrder = "created_at"
-	OrganizationOrderMemberCount OrganizationOrder = "member_count"
+	OrganizationOrderName            OrganizationOrder = "name"
+	OrganizationOrderCreatedAt       OrganizationOrder = "created_at"
+	OrganizationOrderMemberCount     OrganizationOrder = "member_count"
+	OrganizationOrderRepositoryCount OrganizationOrder = "repository_count"
 )
 
 // MemberOrder identifies the supported organization member sort columns.
@@ -38,11 +40,21 @@ const (
 	OrderDescending OrderDirection = "desc"
 )
 
+// SSHKeyGenerator creates an encrypted SSH identity for a new organization.
+type SSHKeyGenerator interface {
+	Generate(uuid.UUID) (models.OrganizationSSHKey, error)
+}
+
 // Service implements organization access and administration rules.
-type Service struct{ repository *Repository }
+type Service struct {
+	repository *Repository
+	sshKeys    SSHKeyGenerator
+}
 
 // NewService creates an organization service.
-func NewService(repository *Repository) *Service { return &Service{repository: repository} }
+func NewService(repository *Repository, sshKeys SSHKeyGenerator) *Service {
+	return &Service{repository: repository, sshKeys: sshKeys}
+}
 
 // ListForUser returns organizations accessible to the actor.
 func (s *Service) ListForUser(ctx context.Context, actor users.User, query string, limit, offset int) ([]Organization, int64, error) {
@@ -74,6 +86,14 @@ func (s *Service) List(ctx context.Context, actor users.User, query string, limi
 	)
 }
 
+// CountRepositories returns the platform repository inventory to an administrator.
+func (s *Service) CountRepositories(ctx context.Context, actor users.User) (int64, error) {
+	if !actor.IsAdmin {
+		return 0, ErrForbidden
+	}
+	return s.repository.CountRepositories(ctx)
+}
+
 // Create validates and creates an organization for a platform administrator.
 func (s *Service) Create(ctx context.Context, actor users.User, name, slug string) (Organization, error) {
 	if !actor.IsAdmin {
@@ -83,8 +103,12 @@ func (s *Service) Create(ctx context.Context, actor users.User, name, slug strin
 	if name == "" || len(name) > 120 || len(slug) > 63 || !slugPattern.MatchString(slug) {
 		return Organization{}, ErrInvalid
 	}
-	result := Organization{Name: name, Slug: slug}
-	if err := s.repository.Create(ctx, &result); err != nil {
+	result := Organization{ID: uuid.New(), Name: name, Slug: slug}
+	key, err := s.sshKeys.Generate(result.ID)
+	if err != nil {
+		return Organization{}, err
+	}
+	if err := s.repository.CreateWithSSHKey(ctx, &result, &key); err != nil {
 		return Organization{}, err
 	}
 	return result, nil
@@ -170,7 +194,7 @@ func normalizeLimit(limit int) int {
 // normalizeOrganizationOrder restricts client input to supported columns.
 func normalizeOrganizationOrder(value string) OrganizationOrder {
 	switch OrganizationOrder(value) {
-	case OrganizationOrderCreatedAt, OrganizationOrderMemberCount:
+	case OrganizationOrderCreatedAt, OrganizationOrderMemberCount, OrganizationOrderRepositoryCount:
 		return OrganizationOrder(value)
 	default:
 		return OrganizationOrderName

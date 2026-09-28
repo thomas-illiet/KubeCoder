@@ -6,19 +6,23 @@ import (
 	"net/http"
 
 	adminorganizations "github.com/thomas-illiet/KubeCoder/backend/internal/api/admin/organizations"
+	agentapi "github.com/thomas-illiet/KubeCoder/backend/internal/api/agents"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/api/health"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/api/httpx"
 	organizationapi "github.com/thomas-illiet/KubeCoder/backend/internal/api/organizations"
+	repositoryapi "github.com/thomas-illiet/KubeCoder/backend/internal/api/repositories"
 	userapi "github.com/thomas-illiet/KubeCoder/backend/internal/api/users"
 )
 
 // New builds the complete HTTP handler and registers each API category.
-func New(logger *slog.Logger, healthHandler *health.Handler, userHandler *userapi.Handler, organizationHandler *organizationapi.Handler, adminOrganizationHandler *adminorganizations.Handler, allowedOrigins []string) http.Handler {
+func New(logger *slog.Logger, healthHandler *health.Handler, userHandler *userapi.Handler, organizationHandler *organizationapi.Handler, adminOrganizationHandler *adminorganizations.Handler, agentHandler *agentapi.Handler, repositoryHandler *repositoryapi.Handler, allowedOrigins []string) http.Handler {
 	mux := http.NewServeMux()
 	health.RegisterRoutes(mux, healthHandler)
 	userapi.RegisterRoutes(mux, userHandler)
 	organizationapi.RegisterRoutes(mux, organizationHandler)
 	adminorganizations.RegisterRoutes(mux, adminOrganizationHandler)
+	agentapi.RegisterRoutes(mux, agentHandler)
+	repositoryapi.RegisterRoutes(mux, repositoryHandler)
 	registerDocumentationRoutes(mux)
 	return httpx.Middleware(logger, httpx.CORS(allowedOrigins, mux))
 }

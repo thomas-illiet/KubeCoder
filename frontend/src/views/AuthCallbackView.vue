@@ -2,14 +2,17 @@
 import { onMounted, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
+import { useOrganizations } from '../composables/useOrganizations'
 
 const router = useRouter()
 const { completeLogin } = useAuth()
+const organizations = useOrganizations()
 const redirecting = shallowRef(false)
 
 onMounted(async () => {
   try {
     const returnTo = await completeLogin()
+    await organizations.initialize()
     await router.replace(returnTo)
   } catch {
     redirecting.value = true

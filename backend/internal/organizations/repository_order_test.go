@@ -13,6 +13,7 @@ func TestOrganizationOrderClause(t *testing.T) {
 		{name: "name ascending", orderBy: OrganizationOrderName, direction: OrderAscending, want: "organizations.name ASC, organizations.id ASC"},
 		{name: "creation descending", orderBy: OrganizationOrderCreatedAt, direction: OrderDescending, want: "organizations.created_at DESC, organizations.id ASC"},
 		{name: "members ascending", orderBy: OrganizationOrderMemberCount, direction: OrderAscending, want: "member_count ASC, organizations.id ASC"},
+		{name: "repositories descending", orderBy: OrganizationOrderRepositoryCount, direction: OrderDescending, want: "repository_count DESC, organizations.id ASC"},
 		{name: "unknown values are safe defaults", orderBy: OrganizationOrder("unsafe"), direction: OrderDirection("unsafe"), want: "organizations.name ASC, organizations.id ASC"},
 	}
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import type { Organization, OrganizationMember } from '../../api/organizations'
+import type { AdminOrganization, OrganizationMember } from '../../api/organizations'
 import type { CurrentUser } from '../../api/users'
 import OrganizationFormDialog from '../../components/organizations/OrganizationFormDialog.vue'
 import OrganizationMembersPanel from '../../components/organizations/OrganizationMembersPanel.vue'
@@ -14,7 +14,7 @@ const route = useRoute()
 const router = useRouter()
 const service = useOrganizations()
 const notifications = useNotifications()
-const organization = shallowRef<Organization | null>(null)
+const organization = shallowRef<AdminOrganization | null>(null)
 const members = shallowRef<OrganizationMember[]>([])
 const memberPage = shallowRef(1)
 const memberTotal = shallowRef(0)
@@ -147,7 +147,9 @@ async function removeMember(userID: string): Promise<void> {
 async function renameOrganization(input: { name: string; slug: string }): Promise<void> {
   if (!organization.value) return
   try {
-    organization.value = await service.rename(organization.value.id, input.name)
+    const current = organization.value
+    const renamed = await service.rename(current.id, input.name)
+    organization.value = { ...current, ...renamed }
     formOpen.value = false
     notifications.success('Organization renamed')
   } catch (error) {
@@ -239,6 +241,10 @@ watch(memberQuery, (_value, _previous, onCleanup) => {
       <div class="organization-meta__item">
         <v-icon icon="mdi-account-multiple-outline" size="18" />
         <div><div class="organization-meta__label">Members</div><div class="organization-meta__value">{{ organizationMemberCount }}</div></div>
+      </div>
+      <div class="organization-meta__item">
+        <v-icon icon="mdi-source-repository" size="18" />
+        <div><div class="organization-meta__label">Repositories</div><div class="organization-meta__value">{{ organization.repository_count }}</div></div>
       </div>
     </div>
   </SectionCard>

@@ -13,9 +13,12 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/thomas-illiet/KubeCoder/backend/internal/agents"
 	adminorganizationapi "github.com/thomas-illiet/KubeCoder/backend/internal/api/admin/organizations"
+	agentapi "github.com/thomas-illiet/KubeCoder/backend/internal/api/agents"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/api/health"
 	organizationapi "github.com/thomas-illiet/KubeCoder/backend/internal/api/organizations"
+	repositoryapi "github.com/thomas-illiet/KubeCoder/backend/internal/api/repositories"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/api/server"
 	userapi "github.com/thomas-illiet/KubeCoder/backend/internal/api/users"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/auth"
@@ -24,6 +27,8 @@ import (
 	"github.com/thomas-illiet/KubeCoder/backend/internal/logging"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/migration"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/organizations"
+	"github.com/thomas-illiet/KubeCoder/backend/internal/repositories"
+	"github.com/thomas-illiet/KubeCoder/backend/internal/sshkeys"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/users"
 )
 
@@ -88,13 +93,26 @@ func (a *application) serveCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			masterKey, err := cfg.OrganizationSSHKeyEncryptionKey()
+			if err != nil {
+				return err
+			}
+			sshKeyService, err := sshkeys.NewService(db.GORM, masterKey)
+			if err != nil {
+				return err
+			}
 			userService := users.NewService(users.NewRepository(db.GORM))
 			userHandler := userapi.NewHandler(logger, verifier, userService)
-			organizationService := organizations.NewService(organizations.NewRepository(db.GORM))
-			organizationHandler := organizationapi.NewHandler(logger, verifier, userService, organizationService)
+			organizationRepository := organizations.NewRepository(db.GORM)
+			organizationService := organizations.NewService(organizationRepository, sshKeyService)
+			organizationHandler := organizationapi.NewHandler(logger, verifier, userService, organizationService, sshKeyService)
 			adminOrganizationHandler := adminorganizationapi.NewHandler(logger, verifier, userService, organizationService)
+			agentService := agents.NewService(agents.NewRepository(db.GORM))
+			agentHandler := agentapi.NewHandler(logger, verifier, userService, organizationService, agentService)
+			repositoryService := repositories.NewService(repositories.NewRepository(db.GORM), organizationRepository)
+			repositoryHandler := repositoryapi.NewHandler(logger, verifier, userService, repositoryService)
 			healthHandler := health.NewHandler(db.SQL, health.SchemaReady(db.SQL))
-			handler := server.New(logger, healthHandler, userHandler, organizationHandler, adminOrganizationHandler, cfg.HTTP.AllowedOrigins)
+			handler := server.New(logger, healthHandler, userHandler, organizationHandler, adminOrganizationHandler, agentHandler, repositoryHandler, cfg.HTTP.AllowedOrigins)
 			server := &http.Server{
 				Addr: cfg.HTTP.Address, Handler: handler, ReadTimeout: cfg.HTTP.ReadTimeout,
 				WriteTimeout: cfg.HTTP.WriteTimeout, IdleTimeout: cfg.HTTP.IdleTimeout,

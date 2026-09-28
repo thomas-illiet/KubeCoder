@@ -18,6 +18,7 @@ export const router = createRouter({
         { path: 'skills', component: () => import('./views/EffectiveSkillsView.vue'), meta: { section: 'Organization', title: 'Skills', subtitle: 'Capabilities effectively applied to your repositories' } },
         { path: 'mcp', component: () => import('./views/EffectiveMcpView.vue'), meta: { section: 'Organization', title: 'MCP servers', subtitle: 'Catalog and activation of organization tool connectors' } },
         { path: 'secrets', component: () => import('./views/OrganizationSecretsView.vue'), meta: { section: 'Organization', title: 'Secrets', subtitle: 'Protected values, rotations, and organization bindings' } },
+        { path: 'ssh-key', component: () => import('./views/OrganizationSSHKeyView.vue'), meta: { section: 'Organization', title: 'Git SSH key', subtitle: 'Public identity for organization Git access' } },
         { path: 'settings', component: () => import('./views/OrganizationSettingsView.vue'), meta: { section: 'Organization', title: 'Settings', subtitle: 'Settings available in this organization' } },
         { path: 'documentation', component: () => import('./views/DocumentationView.vue'), meta: { section: 'Developer tools', title: 'Documentation', subtitle: 'Explore and consume the KubeCoder API' } },
         { path: 'profile', component: () => import('./views/ProfileView.vue'), meta: { section: 'Account', title: 'Profile', subtitle: 'Personal information and account preferences' } },

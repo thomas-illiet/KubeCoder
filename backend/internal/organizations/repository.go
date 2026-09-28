@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/thomas-illiet/KubeCoder/backend/internal/models"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/users"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -78,15 +79,25 @@ func (r *Repository) List(ctx context.Context, query string, limit, offset int, 
 	}
 	result := make([]OrganizationSummary, 0)
 	listStatement := r.db.WithContext(ctx).Model(&Organization{}).
-		Select("organizations.*, COUNT(organization_memberships.user_id) AS member_count").
-		Joins("LEFT JOIN organization_memberships ON organization_memberships.organization_id = organizations.id")
+		Select(`organizations.*,
+			(SELECT COUNT(*) FROM organization_memberships WHERE organization_memberships.organization_id = organizations.id) AS member_count,
+			(SELECT COUNT(*) FROM repositories WHERE repositories.organization_id = organizations.id) AS repository_count`)
 	if query != "" {
 		listStatement = listStatement.Where("organizations.name ILIKE ? OR organizations.slug ILIKE ?", "%"+query+"%", "%"+query+"%")
 	}
-	if err := listStatement.Group("organizations.id").Order(organizationOrderClause(orderBy, orderDirection)).Limit(limit).Offset(offset).Scan(&result).Error; err != nil {
+	if err := listStatement.Order(organizationOrderClause(orderBy, orderDirection)).Limit(limit).Offset(offset).Scan(&result).Error; err != nil {
 		return nil, 0, err
 	}
 	return result, total, nil
+}
+
+// CountRepositories returns the number of repositories across every organization.
+func (r *Repository) CountRepositories(ctx context.Context) (int64, error) {
+	var total int64
+	if err := r.db.WithContext(ctx).Model(&models.Repository{}).Count(&total).Error; err != nil {
+		return 0, fmt.Errorf("count repositories: %w", err)
+	}
+	return total, nil
 }
 
 // organizationOrderClause returns a deterministic SQL order from trusted enum values.
@@ -97,6 +108,8 @@ func organizationOrderClause(orderBy OrganizationOrder, direction OrderDirection
 		column = "organizations.created_at"
 	case OrganizationOrderMemberCount:
 		column = "member_count"
+	case OrganizationOrderRepositoryCount:
+		column = "repository_count"
 	}
 	keyword := "ASC"
 	if direction == OrderDescending {
@@ -114,6 +127,20 @@ func (r *Repository) Create(ctx context.Context, organization *Organization) err
 		return err
 	}
 	return nil
+}
+
+// CreateWithSSHKey atomically persists an organization and its encrypted SSH identity.
+func (r *Repository) CreateWithSSHKey(ctx context.Context, organization *Organization, key *models.OrganizationSSHKey) error {
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(organization).Error; err != nil {
+			return err
+		}
+		return tx.Create(key).Error
+	})
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return ErrConflict
+	}
+	return err
 }
 
 // FindByID returns an organization by its internal identifier.

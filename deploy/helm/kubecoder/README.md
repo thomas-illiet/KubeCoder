@@ -15,11 +15,16 @@ docker build -t kubecoder:dev ./backend
 Install Keycloak first, then KubeCoder:
 
 ```sh
+kubectl create namespace kubecoder-system --dry-run=client -o yaml | kubectl apply -f -
+kubectl create secret generic kubecoder-organization-ssh-key-encryption \
+  --namespace kubecoder-system \
+  --from-literal=encryption-key="$(openssl rand -base64 32)"
 helm upgrade --install kubecoder ./deploy/helm/kubecoder \
   --namespace kubecoder-system \
   --create-namespace \
   --wait \
   --wait-for-jobs \
+  --set security.organizationSSHKeys.existingSecret=kubecoder-organization-ssh-key-encryption \
   --timeout 10m
 ```
 

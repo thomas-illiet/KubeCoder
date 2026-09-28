@@ -5,9 +5,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { useNotifications } from '../composables/useNotifications'
 import { useAuth } from '../composables/useAuth'
 import { useOrganizations } from '../composables/useOrganizations'
-import { documentationTarget, isSearchShortcut, type LayoutMode } from './navigation'
+import { documentationTarget, isSearchShortcut, organizationSettingsNavigation, type LayoutMode, type NavigationItem } from './navigation'
 
-type NavigationItem = { title: string; icon: string; to: string }
 type NavigationGroup = { title: string; items: NavigationItem[] }
 
 const props = defineProps<{ mode: LayoutMode }>()
@@ -64,9 +63,7 @@ const organizationGroups = computed<NavigationGroup[]>(() => [
   },
   {
     title: 'Organization',
-    items: [
-      { title: 'Settings', icon: 'mdi-tune-variant', to: `${organizationBase.value}/settings` },
-    ],
+    items: organizationSettingsNavigation(organizationBase.value),
   },
 ])
 

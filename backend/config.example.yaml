@@ -16,6 +16,9 @@ oidc:
   discovery_url: ""
   audience: kubecoder-api
   timeout: 10s
+security:
+  # Base64 encoding of exactly 32 random bytes. Keep this value stable and secret.
+  organization_ssh_key_encryption_key: ""
 log:
   level: info
   format: json
