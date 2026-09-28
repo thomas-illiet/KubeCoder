@@ -5,9 +5,21 @@ info:
   description: KubeCoder control-plane API.
 servers:
   - url: /
+tags:
+  - name: Account
+    description: Authenticated user profile.
+  - name: Organizations
+    description: Organizations accessible to the authenticated user.
+  - name: Organization administration
+    description: Administrative organization and membership management.
+  - name: User administration
+    description: Administrative access to provisioned users.
+  - name: System
+    description: Service health and readiness.
 paths:
   /api/v1/users/me:
     get:
+      tags: [Account]
       operationId: getCurrentUser
       summary: Return the authenticated application user
       security:
@@ -25,6 +37,7 @@ paths:
           $ref: '#/components/responses/InternalError'
   /api/v1/organizations:
     get:
+      tags: [Organizations]
       operationId: listUserOrganizations
       summary: List organizations accessible to the authenticated user
       security: [{ bearerAuth: [] }]
@@ -43,6 +56,7 @@ paths:
     parameters:
       - { $ref: '#/components/parameters/OrganizationSlug' }
     get:
+      tags: [Organizations]
       operationId: getUserOrganization
       summary: Return an organization accessible to the authenticated user
       security: [{ bearerAuth: [] }]
@@ -58,6 +72,7 @@ paths:
     parameters:
       - { $ref: '#/components/parameters/OrganizationSlug' }
     put:
+      tags: [Organizations]
       operationId: setPreferredOrganization
       summary: Set the authenticated user preferred organization
       security: [{ bearerAuth: [] }]
@@ -71,6 +86,7 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
   /api/v1/admin/organizations:
     get:
+      tags: [Organization administration]
       operationId: listOrganizations
       summary: List all organizations
       security: [{ bearerAuth: [] }]
@@ -88,6 +104,7 @@ paths:
               schema: { $ref: '#/components/schemas/AdminOrganizationPage' }
         '403': { $ref: '#/components/responses/Forbidden' }
     post:
+      tags: [Organization administration]
       operationId: createOrganization
       summary: Create an organization
       security: [{ bearerAuth: [] }]
@@ -109,6 +126,7 @@ paths:
     parameters:
       - { $ref: '#/components/parameters/OrganizationID' }
     get:
+      tags: [Organization administration]
       operationId: getOrganization
       summary: Return an organization for administration
       security: [{ bearerAuth: [] }]
@@ -121,6 +139,7 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
     patch:
+      tags: [Organization administration]
       operationId: renameOrganization
       summary: Rename an organization
       security: [{ bearerAuth: [] }]
@@ -144,6 +163,7 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
     delete:
+      tags: [Organization administration]
       operationId: deleteOrganization
       summary: Permanently delete an organization
       security: [{ bearerAuth: [] }]
@@ -155,6 +175,7 @@ paths:
     parameters:
       - { $ref: '#/components/parameters/OrganizationID' }
     get:
+      tags: [Organization administration]
       operationId: listOrganizationMembers
       summary: List organization members
       security: [{ bearerAuth: [] }]
@@ -173,6 +194,7 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
     post:
+      tags: [Organization administration]
       operationId: addOrganizationMember
       summary: Add a provisioned user to an organization
       security: [{ bearerAuth: [] }]
@@ -199,6 +221,7 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     delete:
+      tags: [Organization administration]
       operationId: removeOrganizationMember
       summary: Remove a user from an organization
       security: [{ bearerAuth: [] }]
@@ -208,6 +231,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/admin/users:
     get:
+      tags: [User administration]
       operationId: listProvisionedUsers
       summary: List provisioned users for membership assignment
       security: [{ bearerAuth: [] }]
@@ -224,12 +248,14 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
   /healthz:
     get:
+      tags: [System]
       operationId: health
       responses:
         '200':
           description: Process is alive
   /readyz:
     get:
+      tags: [System]
       operationId: readiness
       responses:
         '200':
