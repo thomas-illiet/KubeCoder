@@ -55,7 +55,7 @@ const quickLinks = [
         </div>
         <div class="security-note mt-5">
           <v-icon icon="mdi-information-outline" size="19" color="info" />
-          <span>This dashboard contains mock data only for interface validation. No secrets or runtime environments are connected.</span>
+          <span>No secrets or runtime environment credentials are displayed in this dashboard.</span>
         </div>
       </div>
     </SectionCard>
@@ -68,7 +68,7 @@ const quickLinks = [
   </div>
 
   <div class="split-grid">
-    <SectionCard title="Recent activity" subtitle="Mock administration operations">
+    <SectionCard title="Recent activity" subtitle="Latest administration operations">
       <div class="activity-list">
         <div v-for="item in activity" :key="item.title" class="activity-item">
           <div class="activity-icon"><v-icon :icon="item.icon" size="17" /></div>

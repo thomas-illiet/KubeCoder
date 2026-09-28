@@ -7,7 +7,6 @@
           <div class="brand__copy"><span class="brand__name">KubeCoder</span><span class="brand__tag">DEVELOPER WORKSPACE</span></div>
         </router-link>
         <router-view />
-        <div class="auth-footer">Secure access · Mock interface</div>
       </div>
     </v-main>
   </v-app>

@@ -143,7 +143,7 @@ function continueEditor() {
     <IconSelect v-model="statusFilter" hide-details :items="['All statuses', 'Ready', 'Action required']" />
   </FilterCard>
 
-  <SectionCard title="Repositories" subtitle="Mock repositories visible in Northstar Labs">
+  <SectionCard title="Repositories" subtitle="Repositories visible in Northstar Labs">
     <template #actions><v-btn color="primary" prepend-icon="mdi-plus" @click="openCreate">Add repository</v-btn></template>
     <div class="table-scroll">
       <table class="data-table">
@@ -242,7 +242,7 @@ function continueEditor() {
 
           <v-stepper-window-item :value="4">
             <div class="repository-step-content">
-              <div class="step-heading"><div><h3>Review configuration</h3><p>Confirm the mock configuration before saving the repository binding.</p></div><v-chip color="success" variant="tonal" prepend-icon="mdi-check-circle-outline">Ready to save</v-chip></div>
+              <div class="step-heading"><div><h3>Review configuration</h3><p>Confirm the configuration before saving the repository binding.</p></div><v-chip color="success" variant="tonal" prepend-icon="mdi-check-circle-outline">Ready to save</v-chip></div>
               <div class="review-grid">
                 <div class="review-item"><span>Provider</span><strong><v-icon :icon="providerOptions.find((item) => item.value === provider)?.icon" size="18" class="mr-2" />{{ provider }}</strong></div>
                 <div class="review-item"><span>Repository</span><strong class="code-text">{{ providerTarget }}</strong></div>
