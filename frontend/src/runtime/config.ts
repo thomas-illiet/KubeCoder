@@ -1,3 +1,5 @@
+import { inject, type App, type InjectionKey } from 'vue'
+
 export interface RuntimeConfig {
   apiBaseUrl: string
   oidc: {
@@ -6,6 +8,18 @@ export interface RuntimeConfig {
     redirectUri: string
     postLogoutRedirectUri: string
   }
+}
+
+export const runtimeConfigKey: InjectionKey<RuntimeConfig> = Symbol('kubecoder-runtime-config')
+
+export function installRuntimeConfig(app: App, config: RuntimeConfig): void {
+  app.provide(runtimeConfigKey, config)
+}
+
+export function useRuntimeConfig(): RuntimeConfig {
+  const config = inject(runtimeConfigKey)
+  if (!config) throw new Error('Runtime configuration is not installed.')
+  return config
 }
 
 function assertKeys(value: Record<string, unknown>, expected: string[], path: string): void {

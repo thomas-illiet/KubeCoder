@@ -11,7 +11,7 @@ import StartupErrorView from './views/StartupErrorView.vue'
 import { createAuth, installAuth } from './auth/oidc'
 import { installAuthGuard } from './auth/guard'
 import { router } from './router'
-import { loadRuntimeConfig } from './runtime/config'
+import { installRuntimeConfig, loadRuntimeConfig } from './runtime/config'
 import { createOrganizationService, installOrganizations } from './organizations/service'
 
 const vuetify = createVuetify({
@@ -60,6 +60,7 @@ async function bootstrap() {
     }
   })
   const app = createApp(App).component('IconSelect', IconSelect).use(router).use(vuetify)
+  installRuntimeConfig(app, config)
   installAuth(app, auth)
   installOrganizations(app, organizations)
   app.mount('#app')

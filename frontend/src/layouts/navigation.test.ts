@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canShowWorkspaceSwitch, isSearchShortcut } from './navigation'
+import { canShowWorkspaceSwitch, documentationTarget, isSearchShortcut } from './navigation'
 
 describe('workspace navigation', () => {
   it('hides administration from non-administrators', () => {
@@ -9,6 +9,11 @@ describe('workspace navigation', () => {
 
   it('always lets users leave the administration layout', () => {
     expect(canShowWorkspaceSwitch('admin', true)).toBe(true)
+  })
+
+  it('selects the documentation route for the active workspace', () => {
+    expect(documentationTarget('organization', 'northstar-labs')).toBe('/organizations/northstar-labs/documentation')
+    expect(documentationTarget('admin')).toBe('/admin/documentation')
   })
 
   it('recognizes the search shortcut on macOS and other platforms', () => {

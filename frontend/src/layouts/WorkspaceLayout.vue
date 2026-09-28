@@ -5,7 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useNotifications } from '../composables/useNotifications'
 import { useAuth } from '../composables/useAuth'
 import { useOrganizations } from '../composables/useOrganizations'
-import { canShowWorkspaceSwitch, isSearchShortcut, type LayoutMode } from './navigation'
+import { canShowWorkspaceSwitch, documentationTarget, isSearchShortcut, type LayoutMode } from './navigation'
 
 type NavigationItem = { title: string; icon: string; to: string }
 type NavigationGroup = { title: string; items: NavigationItem[] }
@@ -101,7 +101,12 @@ const adminGroups: NavigationGroup[] = [
 ]
 
 const navigationGroups = computed(() => props.mode === 'admin' ? adminGroups : organizationGroups.value)
-const navigationItems = computed(() => navigationGroups.value.flatMap((group) => group.items))
+const documentationItem = computed<NavigationItem>(() => ({
+  title: 'Documentation',
+  icon: 'mdi-book-open-page-variant-outline',
+  to: documentationTarget(props.mode, organizationService.state.current?.slug),
+}))
+const navigationItems = computed(() => [...navigationGroups.value.flatMap((group) => group.items), documentationItem.value])
 const filteredNavigationItems = computed(() => {
   const term = commandQuery.value.trim().toLocaleLowerCase('en')
   if (!term) return navigationItems.value
@@ -205,6 +210,9 @@ function resetCommandSearch() {
 
       <template #append>
         <div class="px-3 pb-4">
+          <v-list nav density="compact" class="layout-switch pa-0 mb-3">
+            <v-list-item :prepend-icon="documentationItem.icon" :title="documentationItem.title" :to="documentationItem.to" rounded="lg" />
+          </v-list>
           <v-list v-if="showWorkspaceSwitch" nav density="compact" class="layout-switch pa-0 mb-3">
             <v-list-item :prepend-icon="switchIcon" :title="switchTitle" :subtitle="switchSubtitle" :to="switchTarget" rounded="lg" />
           </v-list>
