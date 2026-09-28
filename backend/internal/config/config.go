@@ -21,7 +21,8 @@ type Config struct {
 }
 
 type SecurityConfig struct {
-	OrganizationSSHKeyEncryptionKey string `mapstructure:"organization_ssh_key_encryption_key"`
+	EncryptionKey              string        `mapstructure:"encryption_key"`
+	SecretExpiringSoonDuration time.Duration `mapstructure:"secret_expiring_soon_duration"`
 }
 
 type HTTPConfig struct {
@@ -58,6 +59,7 @@ func Defaults() Config {
 		HTTP:     HTTPConfig{Address: ":8080", ReadTimeout: 10 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, ShutdownTimeout: 15 * time.Second},
 		Database: DatabaseConfig{MaxOpenConns: 20, MaxIdleConns: 5, ConnMaxLifetime: 30 * time.Minute},
 		OIDC:     OIDCConfig{Timeout: 10 * time.Second},
+		Security: SecurityConfig{SecretExpiringSoonDuration: 30 * 24 * time.Hour},
 		Log:      LogConfig{Level: "info", Format: "json"},
 	}
 }
@@ -74,7 +76,7 @@ func Load(configFile string, flags *pflag.FlagSet) (Config, error) {
 		"http.address", "http.read_timeout", "http.write_timeout", "http.idle_timeout", "http.shutdown_timeout", "http.allowed_origins",
 		"database.dsn", "database.max_open_conns", "database.max_idle_conns", "database.conn_max_lifetime",
 		"oidc.issuer", "oidc.discovery_url", "oidc.audience", "oidc.timeout", "log.level", "log.format",
-		"security.organization_ssh_key_encryption_key",
+		"security.encryption_key", "security.secret_expiring_soon_duration",
 	} {
 		if err := v.BindEnv(key); err != nil {
 			return Config{}, fmt.Errorf("bind environment variable for %s: %w", key, err)
@@ -108,12 +110,12 @@ func Load(configFile string, flags *pflag.FlagSet) (Config, error) {
 	return cfg, nil
 }
 
-// OrganizationSSHKeyEncryptionKey decodes and validates the required AES-256 master key.
-func (c Config) OrganizationSSHKeyEncryptionKey() ([]byte, error) {
-	value := strings.TrimSpace(c.Security.OrganizationSSHKeyEncryptionKey)
+// EncryptionKey decodes and validates the AES-256 master key used for database encryption.
+func (c Config) EncryptionKey() ([]byte, error) {
+	value := strings.TrimSpace(c.Security.EncryptionKey)
 	key, err := base64.StdEncoding.Strict().DecodeString(value)
 	if err != nil || len(key) != 32 {
-		return nil, errors.New("security.organization_ssh_key_encryption_key must be base64 encoding exactly 32 bytes")
+		return nil, errors.New("security.encryption_key must be base64 encoding exactly 32 bytes")
 	}
 	return key, nil
 }
@@ -129,6 +131,7 @@ func setDefaults(v *viper.Viper, cfg Config) {
 	v.SetDefault("database.max_idle_conns", cfg.Database.MaxIdleConns)
 	v.SetDefault("database.conn_max_lifetime", cfg.Database.ConnMaxLifetime)
 	v.SetDefault("oidc.timeout", cfg.OIDC.Timeout)
+	v.SetDefault("security.secret_expiring_soon_duration", cfg.Security.SecretExpiringSoonDuration)
 	v.SetDefault("log.level", cfg.Log.Level)
 	v.SetDefault("log.format", cfg.Log.Format)
 }
@@ -153,6 +156,9 @@ func (c Config) Validate() error {
 	}
 	if c.Log.Format != "json" && c.Log.Format != "text" {
 		errs = append(errs, errors.New("log.format must be json or text"))
+	}
+	if c.Security.SecretExpiringSoonDuration <= 0 {
+		errs = append(errs, errors.New("security.secret_expiring_soon_duration must be positive"))
 	}
 	return errors.Join(errs...)
 }

@@ -17,8 +17,9 @@ oidc:
   audience: kubecoder-api
   timeout: 10s
 security:
-  # Base64 encoding of exactly 32 random bytes. Keep this value stable and secret.
-  organization_ssh_key_encryption_key: ""
+  # Base64 encoding of exactly 32 random bytes used for every encrypted database field.
+  encryption_key: ""
+  secret_expiring_soon_duration: 720h
 log:
   level: info
   format: json

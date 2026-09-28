@@ -19,6 +19,7 @@ import (
 	"github.com/thomas-illiet/KubeCoder/backend/internal/api/health"
 	organizationapi "github.com/thomas-illiet/KubeCoder/backend/internal/api/organizations"
 	repositoryapi "github.com/thomas-illiet/KubeCoder/backend/internal/api/repositories"
+	secretapi "github.com/thomas-illiet/KubeCoder/backend/internal/api/secrets"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/api/server"
 	userapi "github.com/thomas-illiet/KubeCoder/backend/internal/api/users"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/auth"
@@ -28,6 +29,7 @@ import (
 	"github.com/thomas-illiet/KubeCoder/backend/internal/migration"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/organizations"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/repositories"
+	"github.com/thomas-illiet/KubeCoder/backend/internal/secrets"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/sshkeys"
 	"github.com/thomas-illiet/KubeCoder/backend/internal/users"
 )
@@ -93,7 +95,7 @@ func (a *application) serveCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			masterKey, err := cfg.OrganizationSSHKeyEncryptionKey()
+			masterKey, err := cfg.EncryptionKey()
 			if err != nil {
 				return err
 			}
@@ -111,8 +113,13 @@ func (a *application) serveCommand() *cobra.Command {
 			agentHandler := agentapi.NewHandler(logger, verifier, userService, organizationService, agentService)
 			repositoryService := repositories.NewService(repositories.NewRepository(db.GORM), organizationRepository)
 			repositoryHandler := repositoryapi.NewHandler(logger, verifier, userService, repositoryService)
+			secretService, err := secrets.NewService(secrets.NewRepository(db.GORM), masterKey, cfg.Security.SecretExpiringSoonDuration)
+			if err != nil {
+				return err
+			}
+			secretHandler := secretapi.NewHandler(logger, verifier, userService, organizationService, secretService)
 			healthHandler := health.NewHandler(db.SQL, health.SchemaReady(db.SQL))
-			handler := server.New(logger, healthHandler, userHandler, organizationHandler, adminOrganizationHandler, agentHandler, repositoryHandler, cfg.HTTP.AllowedOrigins)
+			handler := server.New(logger, healthHandler, userHandler, organizationHandler, adminOrganizationHandler, agentHandler, repositoryHandler, secretHandler, cfg.HTTP.AllowedOrigins)
 			server := &http.Server{
 				Addr: cfg.HTTP.Address, Handler: handler, ReadTimeout: cfg.HTTP.ReadTimeout,
 				WriteTimeout: cfg.HTTP.WriteTimeout, IdleTimeout: cfg.HTTP.IdleTimeout,

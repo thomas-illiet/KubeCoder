@@ -17,5 +17,6 @@ data:
   KUBECODER_OIDC_ISSUER: {{ required "oidc.issuer is required" .Values.oidc.issuer | quote }}
   KUBECODER_OIDC_DISCOVERY_URL: {{ .Values.oidc.discoveryURL | quote }}
   KUBECODER_OIDC_AUDIENCE: {{ required "oidc.audience is required" .Values.oidc.audience | quote }}
+  KUBECODER_SECURITY_SECRET_EXPIRING_SOON_DURATION: {{ .Values.security.secrets.expiringSoonDuration | quote }}
   KUBECODER_LOG_LEVEL: {{ .Values.log.level | quote }}
   KUBECODER_LOG_FORMAT: {{ .Values.log.format | quote }}

@@ -18,6 +18,10 @@ tags:
     description: Platform-managed agent definitions.
   - name: Repositories
     description: Organization repository configuration and public agent catalog.
+  - name: Secrets
+    description: Read-only organization secret metadata.
+  - name: Secret administration
+    description: Write-only platform and tenant secret management.
   - name: System
     description: Service health and readiness.
 paths:
@@ -403,6 +407,81 @@ paths:
       responses:
         '204': { description: Repository deleted }
         '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/organizations/{slug}/secrets:
+    parameters: [{ $ref: '#/components/parameters/OrganizationSlug' }]
+    get:
+      tags: [Secrets]
+      operationId: listOrganizationSecrets
+      summary: List sanitized secret metadata for an organization member
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/Query' }, { $ref: '#/components/parameters/Limit' }, { $ref: '#/components/parameters/Offset' }, { $ref: '#/components/parameters/OrganizationSecretScopeFilter' }, { $ref: '#/components/parameters/SecretStatusFilter' }, { $ref: '#/components/parameters/SecretSortBy' }, { $ref: '#/components/parameters/SortOrder' }]
+      responses:
+        '200': { description: Sanitized secret page, content: { application/json: { schema: { $ref: '#/components/schemas/SecretPage' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Secrets]
+      operationId: createOrganizationSecret
+      security: [{ bearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SecretInput' } } } }
+      responses: { '201': { description: Created tenant secret, content: { application/json: { schema: { $ref: '#/components/schemas/Secret' } } } }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /api/v1/organizations/{slug}/secrets/targets:
+    parameters: [{ $ref: '#/components/parameters/OrganizationSlug' }]
+    get: { tags: [Secrets], operationId: listOrganizationSecretTargets, security: [{ bearerAuth: [] }], responses: { '200': { description: Tenant binding targets, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/SecretTarget' } } } } }, '403': { $ref: '#/components/responses/Forbidden' } } }
+  /api/v1/organizations/{slug}/secrets/{id}/replace:
+    parameters: [{ $ref: '#/components/parameters/OrganizationSlug' }, { $ref: '#/components/parameters/ResourceID' }]
+    post: { tags: [Secrets], operationId: replaceOrganizationSecretValue, security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SecretReplaceInput' } } } }, responses: { '200': { description: Updated tenant secret, content: { application/json: { schema: { $ref: '#/components/schemas/Secret' } } } }, '404': { $ref: '#/components/responses/NotFound' } } }
+  /api/v1/organizations/{slug}/secrets/{id}/bindings:
+    parameters: [{ $ref: '#/components/parameters/OrganizationSlug' }, { $ref: '#/components/parameters/ResourceID' }]
+    post: { tags: [Secrets], operationId: bindOrganizationSecret, security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SecretBindingInput' } } } }, responses: { '201': { description: Created tenant binding, content: { application/json: { schema: { $ref: '#/components/schemas/SecretBinding' } } } } } }
+  /api/v1/organizations/{slug}/secrets/{id}/bindings/{bindingID}:
+    parameters: [{ $ref: '#/components/parameters/OrganizationSlug' }, { $ref: '#/components/parameters/ResourceID' }, { $ref: '#/components/parameters/BindingID' }]
+    delete: { tags: [Secrets], operationId: unbindOrganizationSecret, security: [{ bearerAuth: [] }], responses: { '204': { description: Binding removed }, '404': { $ref: '#/components/responses/NotFound' } } }
+  /api/v1/admin/secrets:
+    get:
+      tags: [Secret administration]
+      operationId: listPlatformSecrets
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/Query' }, { $ref: '#/components/parameters/Limit' }, { $ref: '#/components/parameters/Offset' }, { $ref: '#/components/parameters/SecretStatusFilter' }, { $ref: '#/components/parameters/SecretSortBy' }, { $ref: '#/components/parameters/SortOrder' }]
+      responses:
+        '200': { description: Platform secret page, content: { application/json: { schema: { $ref: '#/components/schemas/SecretPage' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Secret administration]
+      operationId: createPlatformSecret
+      security: [{ bearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SecretInput' } } } }
+      responses:
+        '201': { description: Sanitized secret metadata, content: { application/json: { schema: { $ref: '#/components/schemas/Secret' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/admin/secrets/{id}/replace:
+    parameters: [{ $ref: '#/components/parameters/ResourceID' }]
+    post: { tags: [Secret administration], operationId: replacePlatformSecretValue, security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SecretReplaceInput' } } } }, responses: { '200': { description: Updated sanitized metadata, content: { application/json: { schema: { $ref: '#/components/schemas/Secret' } } } }, '404': { $ref: '#/components/responses/NotFound' } } }
+  /api/v1/admin/secrets/{id}/bindings:
+    parameters: [{ $ref: '#/components/parameters/ResourceID' }]
+    post: { tags: [Secret administration], operationId: bindPlatformSecret, security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SecretBindingInput' } } } }, responses: { '201': { description: Created binding, content: { application/json: { schema: { $ref: '#/components/schemas/SecretBinding' } } } } } }
+  /api/v1/admin/secrets/{id}/bindings/{bindingID}:
+    parameters: [{ $ref: '#/components/parameters/ResourceID' }, { $ref: '#/components/parameters/BindingID' }]
+    delete: { tags: [Secret administration], operationId: unbindPlatformSecret, security: [{ bearerAuth: [] }], responses: { '204': { description: Binding removed }, '404': { $ref: '#/components/responses/NotFound' } } }
+  /api/v1/admin/secrets/targets:
+    get: { tags: [Secret administration], operationId: listPlatformSecretTargets, security: [{ bearerAuth: [] }], responses: { '200': { description: Active agent targets, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/SecretTarget' } } } } } } }
+  /api/v1/admin/organizations/{organizationID}/secrets:
+    parameters: [{ $ref: '#/components/parameters/AdminOrganizationID' }]
+    get: { tags: [Secret administration], operationId: listAdminOrganizationSecrets, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Query' }, { $ref: '#/components/parameters/Limit' }, { $ref: '#/components/parameters/Offset' }, { $ref: '#/components/parameters/SecretScopeFilter' }, { $ref: '#/components/parameters/SecretStatusFilter' }, { $ref: '#/components/parameters/SecretSortBy' }, { $ref: '#/components/parameters/SortOrder' }], responses: { '200': { description: Tenant secret page, content: { application/json: { schema: { $ref: '#/components/schemas/SecretPage' } } } } } }
+    post: { tags: [Secret administration], operationId: createAdminOrganizationSecret, security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SecretInput' } } } }, responses: { '201': { description: Created sanitized metadata, content: { application/json: { schema: { $ref: '#/components/schemas/Secret' } } } } } }
+  /api/v1/admin/organizations/{organizationID}/secrets/{id}/replace:
+    parameters: [{ $ref: '#/components/parameters/AdminOrganizationID' }, { $ref: '#/components/parameters/ResourceID' }]
+    post: { tags: [Secret administration], operationId: replaceAdminOrganizationSecretValue, security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SecretReplaceInput' } } } }, responses: { '200': { description: Updated sanitized metadata, content: { application/json: { schema: { $ref: '#/components/schemas/Secret' } } } } } }
+  /api/v1/admin/organizations/{organizationID}/secrets/{id}/bindings:
+    parameters: [{ $ref: '#/components/parameters/AdminOrganizationID' }, { $ref: '#/components/parameters/ResourceID' }]
+    post: { tags: [Secret administration], operationId: bindAdminOrganizationSecret, security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SecretBindingInput' } } } }, responses: { '201': { description: Created binding, content: { application/json: { schema: { $ref: '#/components/schemas/SecretBinding' } } } } } }
+  /api/v1/admin/organizations/{organizationID}/secrets/{id}/bindings/{bindingID}:
+    parameters: [{ $ref: '#/components/parameters/AdminOrganizationID' }, { $ref: '#/components/parameters/ResourceID' }, { $ref: '#/components/parameters/BindingID' }]
+    delete: { tags: [Secret administration], operationId: unbindAdminOrganizationSecret, security: [{ bearerAuth: [] }], responses: { '204': { description: Binding removed } } }
+  /api/v1/admin/organizations/{organizationID}/secrets/targets:
+    parameters: [{ $ref: '#/components/parameters/AdminOrganizationID' }]
+    get: { tags: [Secret administration], operationId: listAdminOrganizationSecretTargets, security: [{ bearerAuth: [] }], responses: { '200': { description: Active agent and tenant repository targets, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/SecretTarget' } } } } } } }
   /healthz:
     get:
       tags: [System]
@@ -460,6 +539,36 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    AdminOrganizationID:
+      name: organizationID
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    BindingID:
+      name: bindingID
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    SecretScopeFilter:
+      name: scope
+      in: query
+      schema: { type: string, enum: [ORGANIZATION] }
+    OrganizationSecretScopeFilter:
+      name: scope
+      in: query
+      schema: { type: string, enum: [PLATFORM, ORGANIZATION] }
+    SecretStatusFilter:
+      name: status
+      in: query
+      schema: { type: string, enum: [ACTIVE, EXPIRING_SOON, EXPIRED] }
+    SecretSortBy:
+      name: sort_by
+      in: query
+      schema: { type: string, enum: [variable_name, scope, binding_count, value_replaced_at, expires_at, status], default: variable_name }
+    SortOrder:
+      name: sort_order
+      in: query
+      schema: { type: string, enum: [asc, desc], default: asc }
   securitySchemes:
     bearerAuth:
       type: http
@@ -655,6 +764,72 @@ components:
       required: [items, total, limit, offset]
       properties:
         items: { type: array, items: { $ref: '#/components/schemas/Repository' } }
+        total: { type: integer, format: int64 }
+        limit: { type: integer }
+        offset: { type: integer }
+    SecretInput:
+      type: object
+      description: The value is write-only and never appears in a response.
+      required: [scope, variable_name, description, value]
+      properties:
+        scope: { type: string, enum: [PLATFORM, ORGANIZATION] }
+        variable_name: { type: string, pattern: '^[A-Z_][A-Z0-9_]*$', maxLength: 128 }
+        description: { type: string, maxLength: 1000 }
+        value: { type: string, format: password, writeOnly: true, maxLength: 65536 }
+        expires_at: { type: string, format: date-time, nullable: true }
+      additionalProperties: false
+    SecretReplaceInput:
+      type: object
+      description: Atomically overwrites and permanently discards the previous value.
+      required: [value]
+      properties:
+        value: { type: string, format: password, writeOnly: true, maxLength: 65536 }
+        expires_at: { type: string, format: date-time, nullable: true }
+      additionalProperties: false
+    SecretBindingInput:
+      type: object
+      required: [target_type, target_id]
+      properties:
+        target_type: { type: string, enum: [AGENT, REPOSITORY] }
+        target_id: { type: string, format: uuid }
+      additionalProperties: false
+    SecretBinding:
+      type: object
+      required: [id, target_type, target_id, target_name]
+      properties:
+        id: { type: string, format: uuid }
+        target_type: { type: string, enum: [AGENT, REPOSITORY] }
+        target_id: { type: string, format: uuid }
+        target_name: { type: string }
+    SecretTarget:
+      type: object
+      required: [id, type, name]
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string, enum: [AGENT, REPOSITORY] }
+        name: { type: string }
+    Secret:
+      type: object
+      description: Sanitized secret metadata. Protected storage fields are never serialized.
+      required: [id, scope, variable_name, description, value_replaced_at, status, bindings, binding_count, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        scope: { type: string, enum: [PLATFORM, ORGANIZATION] }
+        organization_id: { type: string, format: uuid }
+        variable_name: { type: string }
+        description: { type: string }
+        expires_at: { type: string, format: date-time, nullable: true }
+        value_replaced_at: { type: string, format: date-time }
+        status: { type: string, enum: [ACTIVE, EXPIRING_SOON, EXPIRED] }
+        bindings: { type: array, items: { $ref: '#/components/schemas/SecretBinding' } }
+        binding_count: { type: integer, minimum: 0 }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    SecretPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Secret' } }
         total: { type: integer, format: int64 }
         limit: { type: integer }
         offset: { type: integer }

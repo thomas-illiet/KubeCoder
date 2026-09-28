@@ -99,3 +99,35 @@ type RepositoryAgentBinding struct {
 	CreatedAt    time.Time  `gorm:"not null" json:"created_at"`
 	UpdatedAt    time.Time  `gorm:"not null" json:"updated_at"`
 }
+
+// Secret is a write-only protected value. EncryptedValue, Nonce and Fingerprint
+// are deliberately excluded from every JSON projection.
+type Secret struct {
+	ID                uuid.UUID     `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	Scope             string        `gorm:"not null" json:"scope"`
+	OrganizationID    *uuid.UUID    `gorm:"type:uuid;index" json:"organization_id,omitempty"`
+	Organization      *Organization `gorm:"constraint:OnDelete:CASCADE" json:"-"`
+	VariableName      string        `gorm:"not null" json:"variable_name"`
+	Description       string        `gorm:"not null" json:"description"`
+	EncryptedValue    []byte        `gorm:"not null" json:"-"`
+	Nonce             []byte        `gorm:"not null" json:"-"`
+	Fingerprint       string        `gorm:"not null" json:"-"`
+	EncryptionVersion string        `gorm:"not null" json:"-"`
+	ExpiresAt         *time.Time    `json:"expires_at"`
+	ValueReplacedAt   time.Time     `gorm:"not null" json:"value_replaced_at"`
+	CreatedAt         time.Time     `gorm:"not null" json:"created_at"`
+	UpdatedAt         time.Time     `gorm:"not null" json:"updated_at"`
+}
+
+// SecretBinding makes the current value available to one approved target.
+type SecretBinding struct {
+	ID           uuid.UUID   `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	SecretID     uuid.UUID   `gorm:"type:uuid;not null;index" json:"secret_id"`
+	Secret       Secret      `gorm:"constraint:OnDelete:CASCADE" json:"-"`
+	TargetType   string      `gorm:"not null" json:"target_type"`
+	AgentID      *uuid.UUID  `gorm:"type:uuid;index" json:"agent_id,omitempty"`
+	Agent        *Agent      `gorm:"constraint:OnDelete:CASCADE" json:"agent,omitempty"`
+	RepositoryID *uuid.UUID  `gorm:"type:uuid;index" json:"repository_id,omitempty"`
+	Repository   *Repository `gorm:"constraint:OnDelete:CASCADE" json:"repository,omitempty"`
+	CreatedAt    time.Time   `gorm:"not null" json:"created_at"`
+}

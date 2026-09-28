@@ -43,7 +43,7 @@ kubecoder version
 
 Configuration accepts YAML, `KUBECODER_*` environment variables, and command flags. `oidc.issuer` is always the issuer that must be present in tokens. `oidc.discovery_url` may point to a trusted internal backchannel when the public issuer is not reachable from the API Pod.
 
-`kubecoder serve` also requires `security.organization_ssh_key_encryption_key` (or `KUBECODER_SECURITY_ORGANIZATION_SSH_KEY_ENCRYPTION_KEY`) to contain the base64 encoding of exactly 32 random bytes. Keep this master key secret, stable, and backed up: changing it makes existing encrypted organization private keys unreadable.
+`kubecoder serve` requires `security.encryption_key` (or `KUBECODER_SECURITY_ENCRYPTION_KEY`) to contain the base64 encoding of exactly 32 random bytes. This single master key protects every encrypted database field, including organization SSH private keys and secret values. Keep it stable, secret, and backed up: changing it without re-encrypting stored data makes that data unreadable. `security.secret_expiring_soon_duration` defaults to 30 days.
 
 ## Database migrations
 

@@ -46,11 +46,11 @@ spec:
                 secretKeyRef:
                   name: {{ include "kubecoder.databaseSecretName" . }}
                   key: {{ ternary .Values.postgresql.auth.dsnKey .Values.externalDatabase.dsnSecretKey .Values.postgresql.enabled }}
-            - name: KUBECODER_SECURITY_ORGANIZATION_SSH_KEY_ENCRYPTION_KEY
+            - name: KUBECODER_SECURITY_ENCRYPTION_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "kubecoder.organizationSSHKeySecretName" . }}
-                  key: {{ .Values.security.organizationSSHKeys.encryptionKeySecretKey }}
+                  name: {{ include "kubecoder.encryptionSecretName" . }}
+                  key: {{ .Values.security.encryptionKeySecretKey }}
           securityContext:
             allowPrivilegeEscalation: false
             capabilities: { drop: ["ALL"] }
@@ -68,11 +68,11 @@ spec:
                 secretKeyRef:
                   name: {{ include "kubecoder.databaseSecretName" . }}
                   key: {{ ternary .Values.postgresql.auth.dsnKey .Values.externalDatabase.dsnSecretKey .Values.postgresql.enabled }}
-            - name: KUBECODER_SECURITY_ORGANIZATION_SSH_KEY_ENCRYPTION_KEY
+            - name: KUBECODER_SECURITY_ENCRYPTION_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "kubecoder.organizationSSHKeySecretName" . }}
-                  key: {{ .Values.security.organizationSSHKeys.encryptionKeySecretKey }}
+                  name: {{ include "kubecoder.encryptionSecretName" . }}
+                  key: {{ .Values.security.encryptionKeySecretKey }}
           ports:
             - { name: http, containerPort: 8080 }
           startupProbe:

@@ -5,6 +5,7 @@ import type { AdminOrganization, OrganizationMember } from '../../api/organizati
 import type { CurrentUser } from '../../api/users'
 import OrganizationFormDialog from '../../components/organizations/OrganizationFormDialog.vue'
 import OrganizationMembersPanel from '../../components/organizations/OrganizationMembersPanel.vue'
+import AdminSecretsPanel from '../../components/secrets/AdminSecretsPanel.vue'
 import SectionCard from '../../components/SectionCard.vue'
 import TablePaginationCard from '../../components/TablePaginationCard.vue'
 import { useNotifications } from '../../composables/useNotifications'
@@ -252,6 +253,7 @@ watch(memberQuery, (_value, _previous, onCleanup) => {
     <OrganizationMembersPanel v-model:query="memberQuery" :members="members" :users="users" :loading="loading || membersLoading" :searching="usersLoading" :sort-by="memberSortBy" :sort-direction="memberSortDirection" @search="searchUsers" @sort="changeMemberSort" @add="addMember" @remove="removeMember" />
   </SectionCard>
   <TablePaginationCard v-model="memberPage" :total="memberTotal" :items-per-page="membersPerPage" item-label="members" />
+  <div v-if="organization" class="mt-8"><AdminSecretsPanel :organization-id="organization.id" /></div>
 
   <OrganizationFormDialog v-if="organization" v-model="formOpen" :organization="organization" @submit="renameOrganization" />
   <v-dialog :model-value="deleteOpen" max-width="620" @update:model-value="!$event && closeDeleteOrganization()">

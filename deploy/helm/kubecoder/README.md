@@ -16,7 +16,7 @@ Install Keycloak first, then KubeCoder:
 
 ```sh
 kubectl create namespace kubecoder-system --dry-run=client -o yaml | kubectl apply -f -
-kubectl create secret generic kubecoder-organization-ssh-key-encryption \
+kubectl create secret generic kubecoder-encryption \
   --namespace kubecoder-system \
   --from-literal=encryption-key="$(openssl rand -base64 32)"
 helm upgrade --install kubecoder ./deploy/helm/kubecoder \
@@ -24,7 +24,7 @@ helm upgrade --install kubecoder ./deploy/helm/kubecoder \
   --create-namespace \
   --wait \
   --wait-for-jobs \
-  --set security.organizationSSHKeys.existingSecret=kubecoder-organization-ssh-key-encryption \
+  --set security.existingSecret=kubecoder-encryption \
   --timeout 10m
 ```
 
