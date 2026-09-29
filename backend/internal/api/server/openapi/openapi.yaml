@@ -280,6 +280,9 @@ paths:
         - { $ref: '#/components/parameters/Query' }
         - { $ref: '#/components/parameters/Limit' }
         - { $ref: '#/components/parameters/Offset' }
+        - { $ref: '#/components/parameters/UserRole' }
+        - { $ref: '#/components/parameters/UserOrderBy' }
+        - { $ref: '#/components/parameters/OrderDirection' }
       responses:
         '200':
           description: Provisioned user page
@@ -287,6 +290,39 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/UserPage' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /api/v1/admin/users/{userID}:
+    parameters:
+      - name: userID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      tags: [User administration]
+      operationId: updateProvisionedUserRole
+      summary: Grant or revoke platform administrator access
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateUserRole' }
+      responses:
+        '200': { description: Updated user, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [User administration]
+      operationId: deleteProvisionedUser
+      summary: Delete a provisioned user and their memberships
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: User deleted }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
   /api/v1/admin/agents:
     get:
       tags: [Agent administration]
@@ -533,6 +569,14 @@ components:
       name: order_direction
       in: query
       schema: { type: string, enum: [asc, desc], default: asc }
+    UserRole:
+      name: role
+      in: query
+      schema: { type: string, enum: [all, admin, user], default: all }
+    UserOrderBy:
+      name: order_by
+      in: query
+      schema: { type: string, enum: [display_name, username, email, is_admin, created_at, updated_at], default: display_name }
     OrganizationID:
       name: id
       in: path
@@ -601,6 +645,12 @@ components:
           nullable: true
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
+    UpdateUserRole:
+      type: object
+      required: [is_admin]
+      properties:
+        is_admin: { type: boolean }
+      additionalProperties: false
     OrganizationSummary:
       type: object
       required: [id, name, slug]

@@ -35,6 +35,7 @@ export const router = createRouter({
         { path: 'skills', component: () => import('./views/SkillsView.vue'), meta: { section: 'Administration', title: 'Skills', subtitle: 'Catalog and activation policies' } },
         { path: 'mcp', component: () => import('./views/McpServersView.vue'), meta: { section: 'Administration', title: 'MCP servers', subtitle: 'Global catalog and organization tool connectors' } },
         { path: 'organizations', component: () => import('./views/admin/OrganizationsView.vue'), meta: { section: 'Administration', title: 'Organizations', subtitle: 'Tenants and membership administration' } },
+        { path: 'users', component: () => import('./views/admin/UsersView.vue'), meta: { section: 'Administration', title: 'Users', subtitle: 'Provisioned identities and platform access' } },
         { path: 'organizations/:organizationId', component: () => import('./views/admin/OrganizationDetailView.vue'), meta: { section: 'Organizations', title: 'Organization details', subtitle: 'Membership and organization settings' } },
         { path: 'runtimes', component: () => import('./views/RuntimesView.vue'), meta: { section: 'Administration', title: 'Images & adapters', subtitle: 'Approved runtime supply chain' } },
         { path: 'documentation', component: () => import('./views/DocumentationView.vue'), meta: { section: 'Developer tools', title: 'Documentation', subtitle: 'Explore and consume the KubeCoder API' } },

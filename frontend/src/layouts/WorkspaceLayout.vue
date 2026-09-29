@@ -87,6 +87,7 @@ const adminGroups: NavigationGroup[] = [
     items: [
       { title: 'Secrets', icon: 'mdi-key-variant', to: '/admin/secrets' },
       { title: 'Organizations', icon: 'mdi-domain', to: '/admin/organizations' },
+      { title: 'Users', icon: 'mdi-account-group-outline', to: '/admin/users' },
     ],
   },
   {

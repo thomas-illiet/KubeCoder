@@ -19,7 +19,9 @@ import (
 // UserService resolves and lists provisioned application users.
 type UserService interface {
 	Current(context.Context, auth.Identity) (users.User, error)
-	List(context.Context, users.User, string, int, int) ([]users.User, int64, error)
+	List(context.Context, users.User, string, string, int, int, string, string) ([]users.User, int64, error)
+	UpdateRole(context.Context, users.User, uuid.UUID, bool) (users.User, error)
+	Delete(context.Context, users.User, uuid.UUID) error
 }
 
 // Service defines organization administration operations required by the handler.
@@ -59,6 +61,8 @@ func RegisterRoutes(mux *http.ServeMux, handler *Handler) {
 	mux.HandleFunc("POST /api/v1/admin/organizations/{id}/members", handler.addMember)
 	mux.HandleFunc("DELETE /api/v1/admin/organizations/{id}/members/{userID}", handler.removeMember)
 	mux.HandleFunc("GET /api/v1/admin/users", handler.listUsers)
+	mux.HandleFunc("PATCH /api/v1/admin/users/{userID}", handler.updateUserRole)
+	mux.HandleFunc("DELETE /api/v1/admin/users/{userID}", handler.deleteUser)
 }
 
 type organizationInput struct {
@@ -68,6 +72,10 @@ type organizationInput struct {
 
 type memberInput struct {
 	UserID uuid.UUID `json:"user_id"`
+}
+
+type userRoleInput struct {
+	IsAdmin *bool `json:"is_admin"`
 }
 
 // list returns all organizations to a platform administrator.
@@ -231,12 +239,66 @@ func (h *Handler) listUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	pagination := httpx.ParsePagination(r)
-	items, total, err := h.users.List(r.Context(), actor, r.URL.Query().Get("query"), pagination.Limit, pagination.Offset)
+	items, total, err := h.users.List(
+		r.Context(), actor,
+		r.URL.Query().Get("query"), r.URL.Query().Get("role"),
+		pagination.Limit, pagination.Offset,
+		r.URL.Query().Get("order_by"), r.URL.Query().Get("order_direction"),
+	)
 	if err != nil {
-		h.internalError(w, r, err)
+		h.writeUserError(w, r, err)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, httpx.NewPage(items, total, pagination))
+}
+
+// updateUserRole grants or revokes platform administrator access.
+func (h *Handler) updateUserRole(w http.ResponseWriter, r *http.Request) {
+	actor, userID, ok := h.actorAndUserID(w, r)
+	if !ok {
+		return
+	}
+	var input userRoleInput
+	if !decode(w, r, &input) {
+		return
+	}
+	if input.IsAdmin == nil {
+		httpx.WriteProblem(w, r, http.StatusBadRequest, "Invalid request", "The is_admin field is required.")
+		return
+	}
+	updated, err := h.users.UpdateRole(r.Context(), actor, userID, *input.IsAdmin)
+	if err != nil {
+		h.writeUserError(w, r, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, updated)
+}
+
+// deleteUser permanently removes a provisioned user and their memberships.
+func (h *Handler) deleteUser(w http.ResponseWriter, r *http.Request) {
+	actor, userID, ok := h.actorAndUserID(w, r)
+	if !ok {
+		return
+	}
+	if err := h.users.Delete(r.Context(), actor, userID); err != nil {
+		h.writeUserError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// actorAndUserID authenticates an administrator and parses the target user ID.
+func (h *Handler) actorAndUserID(w http.ResponseWriter, r *http.Request) (users.User, uuid.UUID, bool) {
+	actor, ok := h.actor(w, r)
+	if !ok {
+		return users.User{}, uuid.Nil, false
+	}
+	userID, err := uuid.Parse(r.PathValue("userID"))
+	if err != nil {
+		httpx.WriteProblem(w, r, http.StatusBadRequest, "Invalid request", "The user ID is invalid.")
+		return users.User{}, uuid.Nil, false
+	}
+	return actor, userID, true
 }
 
 // actorAndID authenticates the actor and parses the organization ID.
@@ -283,6 +345,22 @@ func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, err error) 
 		httpx.WriteProblem(w, r, http.StatusConflict, "Conflict", "The organization slug or membership already exists.")
 	case errors.Is(err, domain.ErrInvalid):
 		httpx.WriteProblem(w, r, http.StatusBadRequest, "Invalid request", "The organization name or slug is invalid.")
+	default:
+		h.internalError(w, r, err)
+	}
+}
+
+// writeUserError converts user administration errors to problem responses.
+func (h *Handler) writeUserError(w http.ResponseWriter, r *http.Request, err error) {
+	switch {
+	case errors.Is(err, users.ErrForbidden):
+		httpx.WriteProblem(w, r, http.StatusForbidden, "Forbidden", "Platform administrator access is required.")
+	case errors.Is(err, users.ErrNotFound):
+		httpx.WriteProblem(w, r, http.StatusNotFound, "Not Found", "The user was not found.")
+	case errors.Is(err, users.ErrConflict):
+		httpx.WriteProblem(w, r, http.StatusConflict, "Conflict", "The current or last platform administrator cannot be demoted or deleted.")
+	case errors.Is(err, users.ErrInvalid):
+		httpx.WriteProblem(w, r, http.StatusBadRequest, "Invalid request", "The user filters or ordering are invalid.")
 	default:
 		h.internalError(w, r, err)
 	}
