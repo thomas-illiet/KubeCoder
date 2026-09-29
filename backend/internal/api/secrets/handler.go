@@ -31,6 +31,7 @@ type SecretService interface {
 	CreatePlatform(context.Context, users.User, domain.Input) (domain.View, error)
 	CreateOrganization(context.Context, users.User, uuid.UUID, domain.Input) (domain.View, error)
 	Replace(context.Context, users.User, uuid.UUID, *uuid.UUID, domain.ReplaceInput) (domain.View, error)
+	Delete(context.Context, users.User, uuid.UUID, *uuid.UUID) error
 	AddBinding(context.Context, users.User, uuid.UUID, *uuid.UUID, domain.BindingInput) (domain.BindingView, error)
 	RemoveBinding(context.Context, users.User, uuid.UUID, uuid.UUID, *uuid.UUID) error
 	Targets(context.Context, users.User, *uuid.UUID) ([]domain.Target, error)
@@ -54,12 +55,14 @@ func RegisterRoutes(mux *http.ServeMux, h *Handler) {
 	mux.HandleFunc("GET /api/v1/admin/secrets", h.listPlatform)
 	mux.HandleFunc("POST /api/v1/admin/secrets", h.createPlatform)
 	mux.HandleFunc("POST /api/v1/admin/secrets/{id}/replace", h.replacePlatform)
+	mux.HandleFunc("DELETE /api/v1/admin/secrets/{id}", h.deletePlatform)
 	mux.HandleFunc("POST /api/v1/admin/secrets/{id}/bindings", h.addPlatformBinding)
 	mux.HandleFunc("GET /api/v1/admin/secrets/targets", h.platformTargets)
 	mux.HandleFunc("DELETE /api/v1/admin/secrets/{id}/bindings/{bindingID}", h.removePlatformBinding)
 	mux.HandleFunc("GET /api/v1/admin/organizations/{organizationID}/secrets", h.listOrganizationAdmin)
 	mux.HandleFunc("POST /api/v1/admin/organizations/{organizationID}/secrets", h.createOrganization)
 	mux.HandleFunc("POST /api/v1/admin/organizations/{organizationID}/secrets/{id}/replace", h.replaceOrganization)
+	mux.HandleFunc("DELETE /api/v1/admin/organizations/{organizationID}/secrets/{id}", h.deleteOrganization)
 	mux.HandleFunc("POST /api/v1/admin/organizations/{organizationID}/secrets/{id}/bindings", h.addOrganizationBinding)
 	mux.HandleFunc("GET /api/v1/admin/organizations/{organizationID}/secrets/targets", h.organizationTargets)
 	mux.HandleFunc("DELETE /api/v1/admin/organizations/{organizationID}/secrets/{id}/bindings/{bindingID}", h.removeOrganizationBinding)
@@ -67,6 +70,7 @@ func RegisterRoutes(mux *http.ServeMux, h *Handler) {
 	mux.HandleFunc("POST /api/v1/organizations/{slug}/secrets", h.createOrganizationMember)
 	mux.HandleFunc("GET /api/v1/organizations/{slug}/secrets/targets", h.organizationMemberTargets)
 	mux.HandleFunc("POST /api/v1/organizations/{slug}/secrets/{id}/replace", h.replaceOrganizationMember)
+	mux.HandleFunc("DELETE /api/v1/organizations/{slug}/secrets/{id}", h.deleteOrganizationMember)
 	mux.HandleFunc("POST /api/v1/organizations/{slug}/secrets/{id}/bindings", h.addOrganizationMemberBinding)
 	mux.HandleFunc("DELETE /api/v1/organizations/{slug}/secrets/{id}/bindings/{bindingID}", h.removeOrganizationMemberBinding)
 }
@@ -98,6 +102,9 @@ func (h *Handler) createPlatform(w http.ResponseWriter, r *http.Request) {
 
 // replacePlatform implements the corresponding sanitized secret HTTP operation.
 func (h *Handler) replacePlatform(w http.ResponseWriter, r *http.Request) { h.replace(w, r, nil) }
+
+// deletePlatform permanently removes a platform secret.
+func (h *Handler) deletePlatform(w http.ResponseWriter, r *http.Request) { h.delete(w, r, nil) }
 
 // addPlatformBinding implements the corresponding sanitized secret HTTP operation.
 func (h *Handler) addPlatformBinding(w http.ResponseWriter, r *http.Request) { h.addBinding(w, r, nil) }
@@ -171,6 +178,14 @@ func (h *Handler) replaceOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.replace(w, r, &oid)
+}
+
+// deleteOrganization permanently removes an administrator-managed tenant secret.
+func (h *Handler) deleteOrganization(w http.ResponseWriter, r *http.Request) {
+	_, oid, ok := h.organizationAdmin(w, r)
+	if ok {
+		h.delete(w, r, &oid)
+	}
 }
 
 // addOrganizationBinding implements the corresponding sanitized secret HTTP operation.
@@ -271,6 +286,14 @@ func (h *Handler) replaceOrganizationMember(w http.ResponseWriter, r *http.Reque
 	}
 }
 
+// deleteOrganizationMember permanently removes a tenant secret.
+func (h *Handler) deleteOrganizationMember(w http.ResponseWriter, r *http.Request) {
+	_, oid, ok := h.organizationMember(w, r)
+	if ok {
+		h.delete(w, r, &oid)
+	}
+}
+
 // addOrganizationMemberBinding adds a tenant-constrained binding.
 func (h *Handler) addOrganizationMemberBinding(w http.ResponseWriter, r *http.Request) {
 	_, oid, ok := h.organizationMember(w, r)
@@ -303,6 +326,23 @@ func (h *Handler) replace(w http.ResponseWriter, r *http.Request, oid *uuid.UUID
 	}
 	item, err := h.service.Replace(r.Context(), actor, id, oid, input)
 	h.item(w, r, item, http.StatusOK, err)
+}
+
+// delete implements permanent secret deletion after ownership authorization.
+func (h *Handler) delete(w http.ResponseWriter, r *http.Request, oid *uuid.UUID) {
+	actor, ok := h.actor(w, r)
+	if !ok {
+		return
+	}
+	id, ok := parseID(w, r, "id")
+	if !ok {
+		return
+	}
+	if err := h.service.Delete(r.Context(), actor, id, oid); err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // addBinding implements the corresponding sanitized secret HTTP operation.

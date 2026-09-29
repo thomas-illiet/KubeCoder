@@ -2,6 +2,7 @@ import type { Page } from './organizations'
 
 export type SecretScope = 'PLATFORM' | 'ORGANIZATION'
 export type SecretStatus = 'ACTIVE' | 'EXPIRING_SOON' | 'EXPIRED'
+export type SecretStatusFilter = SecretStatus | 'NOT_EXPIRED'
 export type SecretTargetType = 'AGENT' | 'REPOSITORY'
 export type SecretSortBy = 'variable_name' | 'scope' | 'binding_count' | 'value_replaced_at' | 'expires_at' | 'status'
 export type SortOrder = 'asc' | 'desc'
@@ -23,7 +24,7 @@ export interface Secret {
   updated_at: string
 }
 export interface SecretInput { scope: SecretScope; variable_name: string; description: string; value: string; expires_at?: string | null }
-export interface SecretFilters { query?: string; scope?: SecretScope; status?: SecretStatus; sort_by?: SecretSortBy; sort_order?: SortOrder; limit?: number; offset?: number }
+export interface SecretFilters { query?: string; scope?: SecretScope; status?: SecretStatusFilter; sort_by?: SecretSortBy; sort_order?: SortOrder; limit?: number; offset?: number }
 export interface SecretOwner { organizationID?: string; organizationSlug?: string }
 
 async function request<T>(url: string, token: string, fetcher: typeof fetch, init: RequestInit = {}): Promise<T> {
@@ -55,6 +56,7 @@ export function fetchAdminSecrets(baseURL: string, token: string, filters: Secre
 export function fetchOrganizationSecrets(baseURL: string, token: string, slug: string, filters: SecretFilters = {}, fetcher: typeof fetch = fetch): Promise<Page<Secret>> { return request(`${baseURL}/api/v1/organizations/${encodeURIComponent(slug)}/secrets?${parameters(filters)}`, token, fetcher) }
 export function createSecret(baseURL: string, token: string, input: SecretInput, owner: SecretOwner = {}, fetcher: typeof fetch = fetch): Promise<Secret> { return request(managedCollection(baseURL, owner), token, fetcher, { method: 'POST', body: JSON.stringify(input) }) }
 export function replaceSecret(baseURL: string, token: string, id: string, input: { value: string; expires_at?: string | null }, owner: SecretOwner = {}, fetcher: typeof fetch = fetch): Promise<Secret> { return request(`${managedCollection(baseURL, owner)}/${id}/replace`, token, fetcher, { method: 'POST', body: JSON.stringify(input) }) }
+export function deleteSecret(baseURL: string, token: string, id: string, owner: SecretOwner = {}, fetcher: typeof fetch = fetch): Promise<void> { return request(`${managedCollection(baseURL, owner)}/${id}`, token, fetcher, { method: 'DELETE' }) }
 export function fetchSecretTargets(baseURL: string, token: string, owner: SecretOwner = {}, fetcher: typeof fetch = fetch): Promise<SecretTarget[]> { return request(`${managedCollection(baseURL, owner)}/targets`, token, fetcher) }
 export function addSecretBinding(baseURL: string, token: string, id: string, input: { target_type: SecretTargetType; target_id: string }, owner: SecretOwner = {}, fetcher: typeof fetch = fetch): Promise<SecretBinding> { return request(`${managedCollection(baseURL, owner)}/${id}/bindings`, token, fetcher, { method: 'POST', body: JSON.stringify(input) }) }
 export function removeSecretBinding(baseURL: string, token: string, id: string, bindingID: string, owner: SecretOwner = {}, fetcher: typeof fetch = fetch): Promise<void> { return request(`${managedCollection(baseURL, owner)}/${id}/bindings/${bindingID}`, token, fetcher, { method: 'DELETE' }) }

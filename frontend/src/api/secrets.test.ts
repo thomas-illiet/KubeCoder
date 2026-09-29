@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createSecret, fetchOrganizationSecrets, replaceSecret } from './secrets'
+import { createSecret, deleteSecret, fetchOrganizationSecrets, replaceSecret } from './secrets'
 
 describe('secrets API', () => {
   it('lists the read-only organization projection with encoded slug', async () => {
@@ -20,9 +20,19 @@ describe('secrets API', () => {
     await replaceSecret('http://api','token','secret-id',{value:'new-value'},{organizationID:'org-id'},fetcher)
     expect(fetcher.mock.calls[0]?.[0]).toBe('http://api/api/v1/admin/organizations/org-id/secrets/secret-id/replace')
   })
+  it('deletes a secret in its managed collection', async () => {
+    const fetcher=vi.fn<typeof fetch>().mockResolvedValue(new Response(null,{status:204}))
+    await deleteSecret('http://api','token','secret-id',{organizationSlug:'northstar'},fetcher)
+    expect(fetcher).toHaveBeenCalledWith('http://api/api/v1/organizations/northstar/secrets/secret-id',expect.objectContaining({method:'DELETE'}))
+  })
   it('sends server sorting and pagination parameters', async () => {
     const fetcher=vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({items:[],total:0,limit:20,offset:20}),{status:200}))
     await fetchOrganizationSecrets('http://api','token','northstar',{sort_by:'expires_at',sort_order:'desc',limit:20,offset:20},fetcher)
     expect(fetcher.mock.calls[0]?.[0]).toBe('http://api/api/v1/organizations/northstar/secrets?limit=20&offset=20&sort_by=expires_at&sort_order=desc')
+  })
+  it('sends the server-side filter that hides expired secrets', async () => {
+    const fetcher=vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({items:[],total:0,limit:20,offset:0}),{status:200}))
+    await fetchOrganizationSecrets('http://api','token','northstar',{status:'NOT_EXPIRED'},fetcher)
+    expect(fetcher.mock.calls[0]?.[0]).toBe('http://api/api/v1/organizations/northstar/secrets?limit=20&offset=0&status=NOT_EXPIRED')
   })
 })

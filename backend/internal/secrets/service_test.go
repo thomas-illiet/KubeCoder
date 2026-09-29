@@ -84,6 +84,32 @@ func TestReplacePermanentlyOverwrites(t *testing.T) {
 	}
 }
 
+// TestDeletePermanentlyRemovesSecretAndBindings proves complete cleanup.
+func TestDeletePermanentlyRemovesSecretAndBindings(t *testing.T) {
+	service, db, actor := testService(t)
+	ctx := context.Background()
+	created, err := service.CreatePlatform(ctx, actor, Input{Scope: ScopePlatform, VariableName: "DELETE_TOKEN", Value: "protected"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	binding := Binding{ID: uuid.New(), SecretID: created.ID, TargetType: TargetAgent, CreatedAt: time.Now()}
+	if err := db.Create(&binding).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := service.Delete(ctx, actor, created.ID, nil); err != nil {
+		t.Fatal(err)
+	}
+	for table, model := range map[string]any{"secret": &Secret{}, "binding": &Binding{}} {
+		var count int64
+		if err := db.Model(model).Where("id = ?", map[string]uuid.UUID{"secret": created.ID, "binding": binding.ID}[table]).Count(&count).Error; err != nil {
+			t.Fatal(err)
+		}
+		if count != 0 {
+			t.Fatalf("%s still exists", table)
+		}
+	}
+}
+
 // TestStatusTransitions covers computed lifecycle states.
 func TestStatusTransitions(t *testing.T) {
 	service, _, _ := testService(t)
@@ -101,6 +127,26 @@ func TestStatusTransitions(t *testing.T) {
 				t.Fatalf("got %s want %s", got, item.want)
 			}
 		})
+	}
+}
+
+// TestListCanHideExpired keeps the expiry dropdown compatible with server pagination.
+func TestListCanHideExpired(t *testing.T) {
+	service, db, actor := testService(t)
+	ctx := context.Background()
+	expiredAt := time.Now().Add(-time.Hour)
+	if err := db.Create(&models.Secret{ID: uuid.New(), Scope: ScopePlatform, VariableName: "EXPIRED_TOKEN", ExpiresAt: &expiredAt, ValueReplacedAt: time.Now(), CreatedAt: time.Now(), UpdatedAt: time.Now()}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.CreatePlatform(ctx, actor, Input{Scope: ScopePlatform, VariableName: "ACTIVE_TOKEN", Value: "protected"}); err != nil {
+		t.Fatal(err)
+	}
+	items, total, err := service.ListPlatform(ctx, actor, "", StatusNotExpired, "variable_name", SortAscending, 20, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 1 || len(items) != 1 || items[0].VariableName != "ACTIVE_TOKEN" {
+		t.Fatalf("unexpected filtered result: total=%d items=%v", total, items)
 	}
 }
 

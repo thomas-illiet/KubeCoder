@@ -430,6 +430,9 @@ paths:
   /api/v1/organizations/{slug}/secrets/{id}/replace:
     parameters: [{ $ref: '#/components/parameters/OrganizationSlug' }, { $ref: '#/components/parameters/ResourceID' }]
     post: { tags: [Secrets], operationId: replaceOrganizationSecretValue, security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SecretReplaceInput' } } } }, responses: { '200': { description: Updated tenant secret, content: { application/json: { schema: { $ref: '#/components/schemas/Secret' } } } }, '404': { $ref: '#/components/responses/NotFound' } } }
+  /api/v1/organizations/{slug}/secrets/{id}:
+    parameters: [{ $ref: '#/components/parameters/OrganizationSlug' }, { $ref: '#/components/parameters/ResourceID' }]
+    delete: { tags: [Secrets], operationId: deleteOrganizationSecret, security: [{ bearerAuth: [] }], responses: { '204': { description: Secret and bindings deleted }, '404': { $ref: '#/components/responses/NotFound' } } }
   /api/v1/organizations/{slug}/secrets/{id}/bindings:
     parameters: [{ $ref: '#/components/parameters/OrganizationSlug' }, { $ref: '#/components/parameters/ResourceID' }]
     post: { tags: [Secrets], operationId: bindOrganizationSecret, security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SecretBindingInput' } } } }, responses: { '201': { description: Created tenant binding, content: { application/json: { schema: { $ref: '#/components/schemas/SecretBinding' } } } } } }
@@ -458,6 +461,9 @@ paths:
   /api/v1/admin/secrets/{id}/replace:
     parameters: [{ $ref: '#/components/parameters/ResourceID' }]
     post: { tags: [Secret administration], operationId: replacePlatformSecretValue, security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SecretReplaceInput' } } } }, responses: { '200': { description: Updated sanitized metadata, content: { application/json: { schema: { $ref: '#/components/schemas/Secret' } } } }, '404': { $ref: '#/components/responses/NotFound' } } }
+  /api/v1/admin/secrets/{id}:
+    parameters: [{ $ref: '#/components/parameters/ResourceID' }]
+    delete: { tags: [Secret administration], operationId: deletePlatformSecret, security: [{ bearerAuth: [] }], responses: { '204': { description: Secret and bindings deleted }, '404': { $ref: '#/components/responses/NotFound' } } }
   /api/v1/admin/secrets/{id}/bindings:
     parameters: [{ $ref: '#/components/parameters/ResourceID' }]
     post: { tags: [Secret administration], operationId: bindPlatformSecret, security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SecretBindingInput' } } } }, responses: { '201': { description: Created binding, content: { application/json: { schema: { $ref: '#/components/schemas/SecretBinding' } } } } } }
@@ -473,6 +479,9 @@ paths:
   /api/v1/admin/organizations/{organizationID}/secrets/{id}/replace:
     parameters: [{ $ref: '#/components/parameters/AdminOrganizationID' }, { $ref: '#/components/parameters/ResourceID' }]
     post: { tags: [Secret administration], operationId: replaceAdminOrganizationSecretValue, security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SecretReplaceInput' } } } }, responses: { '200': { description: Updated sanitized metadata, content: { application/json: { schema: { $ref: '#/components/schemas/Secret' } } } } } }
+  /api/v1/admin/organizations/{organizationID}/secrets/{id}:
+    parameters: [{ $ref: '#/components/parameters/AdminOrganizationID' }, { $ref: '#/components/parameters/ResourceID' }]
+    delete: { tags: [Secret administration], operationId: deleteAdminOrganizationSecret, security: [{ bearerAuth: [] }], responses: { '204': { description: Secret and bindings deleted }, '404': { $ref: '#/components/responses/NotFound' } } }
   /api/v1/admin/organizations/{organizationID}/secrets/{id}/bindings:
     parameters: [{ $ref: '#/components/parameters/AdminOrganizationID' }, { $ref: '#/components/parameters/ResourceID' }]
     post: { tags: [Secret administration], operationId: bindAdminOrganizationSecret, security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SecretBindingInput' } } } }, responses: { '201': { description: Created binding, content: { application/json: { schema: { $ref: '#/components/schemas/SecretBinding' } } } } } }
@@ -560,7 +569,8 @@ components:
     SecretStatusFilter:
       name: status
       in: query
-      schema: { type: string, enum: [ACTIVE, EXPIRING_SOON, EXPIRED] }
+      description: Lifecycle status filter. NOT_EXPIRED includes active and expiring secrets while excluding expired ones.
+      schema: { type: string, enum: [ACTIVE, EXPIRING_SOON, EXPIRED, NOT_EXPIRED] }
     SecretSortBy:
       name: sort_by
       in: query

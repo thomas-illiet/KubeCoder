@@ -16,7 +16,7 @@ type Repository struct{ db *gorm.DB }
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 // List returns one scope-filtered page without decrypting values.
-func (r *Repository) List(ctx context.Context, organizationID *uuid.UUID, includePlatform bool, query, scope, status, sortBy, sortOrder string, expiringBefore any, limit, offset int) ([]Secret, int64, error) {
+func (r *Repository) List(ctx context.Context, organizationID *uuid.UUID, includePlatform bool, query, scope, status, sortBy, sortOrder string, currentTime, expiringBefore any, limit, offset int) ([]Secret, int64, error) {
 	statement := r.db.WithContext(ctx).Model(&Secret{})
 	if organizationID == nil {
 		statement = statement.Where("scope = ?", ScopePlatform)
@@ -33,10 +33,12 @@ func (r *Repository) List(ctx context.Context, organizationID *uuid.UUID, includ
 	}
 	if status != "" {
 		switch status {
+		case StatusNotExpired:
+			statement = statement.Where("expires_at IS NULL OR expires_at > ?", currentTime)
 		case StatusExpired:
-			statement = statement.Where("expires_at IS NOT NULL AND expires_at <= now()")
+			statement = statement.Where("expires_at IS NOT NULL AND expires_at <= ?", currentTime)
 		case StatusExpiringSoon:
-			statement = statement.Where("expires_at > now() AND expires_at <= ?", expiringBefore)
+			statement = statement.Where("expires_at > ? AND expires_at <= ?", currentTime, expiringBefore)
 		case StatusActive:
 			statement = statement.Where("expires_at IS NULL OR expires_at > ?", expiringBefore)
 		}
@@ -46,7 +48,7 @@ func (r *Repository) List(ctx context.Context, organizationID *uuid.UUID, includ
 		return nil, 0, err
 	}
 	items := make([]Secret, 0)
-	order := secretOrder(sortBy, sortOrder, expiringBefore)
+	order := secretOrder(sortBy, sortOrder, currentTime, expiringBefore)
 	err := statement.Order(order).Limit(limit).Offset(offset).Find(&items).Error
 	return items, total, err
 }
@@ -59,7 +61,7 @@ func (r *Repository) UserBelongsToOrganization(ctx context.Context, userID, orga
 }
 
 // secretOrder builds a whitelisted stable database ordering expression.
-func secretOrder(sortBy, sortOrder string, expiringBefore any) clause.Expr {
+func secretOrder(sortBy, sortOrder string, currentTime, expiringBefore any) clause.Expr {
 	direction := "ASC"
 	if sortOrder == SortDescending {
 		direction = "DESC"
@@ -75,8 +77,8 @@ func secretOrder(sortBy, sortOrder string, expiringBefore any) clause.Expr {
 		return clause.Expr{SQL: expression + " " + direction + ", id " + direction, WithoutParentheses: true}
 	}
 	return clause.Expr{
-		SQL:  "CASE WHEN expires_at IS NOT NULL AND expires_at <= now() THEN 'EXPIRED' WHEN expires_at IS NOT NULL AND expires_at <= ? THEN 'EXPIRING_SOON' ELSE 'ACTIVE' END " + direction + ", id " + direction,
-		Vars: []any{expiringBefore}, WithoutParentheses: true,
+		SQL:  "CASE WHEN expires_at IS NOT NULL AND expires_at <= ? THEN 'EXPIRED' WHEN expires_at IS NOT NULL AND expires_at <= ? THEN 'EXPIRING_SOON' ELSE 'ACTIVE' END " + direction + ", id " + direction,
+		Vars: []any{currentTime, expiringBefore}, WithoutParentheses: true,
 	}
 }
 
@@ -135,6 +137,23 @@ func (r *Repository) Replace(ctx context.Context, secret Secret) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+// Delete permanently removes a secret and all of its target assignments.
+func (r *Repository) Delete(ctx context.Context, id uuid.UUID) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("secret_id = ?", id).Delete(&Binding{}).Error; err != nil {
+			return err
+		}
+		result := tx.Where("id = ?", id).Delete(&Secret{})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return ErrNotFound
+		}
+		return nil
+	})
 }
 
 // PlatformVariableExists reports whether a global variable shadows tenant scopes.

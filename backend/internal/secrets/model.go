@@ -17,6 +17,7 @@ const (
 	StatusActive       = "ACTIVE"
 	StatusExpiringSoon = "EXPIRING_SOON"
 	StatusExpired      = "EXPIRED"
+	StatusNotExpired   = "NOT_EXPIRED"
 	SortAscending      = "asc"
 	SortDescending     = "desc"
 )

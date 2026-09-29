@@ -63,7 +63,8 @@ func (s *Service) list(ctx context.Context, organizationID *uuid.UUID, includePl
 	if !validFilters(organizationID, includePlatform, scope, status) || sortBy == "" {
 		return nil, 0, ErrInvalid
 	}
-	items, total, err := s.repository.List(ctx, organizationID, includePlatform, strings.TrimSpace(query), scope, status, sortBy, sortOrder, s.now().Add(s.expiringSoon), normalizeLimit(limit), max(offset, 0))
+	now := s.now()
+	items, total, err := s.repository.List(ctx, organizationID, includePlatform, strings.TrimSpace(query), scope, status, sortBy, sortOrder, now, now.Add(s.expiringSoon), normalizeLimit(limit), max(offset, 0))
 	if err != nil {
 		return nil, 0, err
 	}
@@ -151,6 +152,17 @@ func (s *Service) Replace(ctx context.Context, actor users.User, id uuid.UUID, o
 		return View{}, err
 	}
 	return s.view(ctx, item)
+}
+
+// Delete permanently removes a secret inside the requested ownership boundary.
+func (s *Service) Delete(ctx context.Context, actor users.User, id uuid.UUID, organizationID *uuid.UUID) error {
+	if err := s.authorizeMutation(ctx, actor, organizationID); err != nil {
+		return err
+	}
+	if _, err := s.repository.Get(ctx, id, organizationID); err != nil {
+		return err
+	}
+	return s.repository.Delete(ctx, id)
 }
 
 // AddBinding validates tenancy and assigns the current value to a target.
@@ -301,7 +313,7 @@ func validFilters(organizationID *uuid.UUID, includePlatform bool, scope, status
 	if scope != "" && (organizationID == nil || (scope != ScopeOrganization && (!includePlatform || scope != ScopePlatform))) {
 		return false
 	}
-	return status == "" || status == StatusActive || status == StatusExpiringSoon || status == StatusExpired
+	return status == "" || status == StatusActive || status == StatusExpiringSoon || status == StatusExpired || status == StatusNotExpired
 }
 
 // authorizeMutation permits platform administration or explicit tenant membership.

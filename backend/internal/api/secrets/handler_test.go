@@ -50,6 +50,7 @@ type testSecretService struct {
 	items      []domain.View
 	err        error
 	replaceOID *uuid.UUID
+	deleteOID  *uuid.UUID
 }
 
 // ListPlatform returns the configured sanitized page.
@@ -81,6 +82,12 @@ func (f *testSecretService) CreateOrganization(context.Context, users.User, uuid
 func (f *testSecretService) Replace(_ context.Context, _ users.User, _ uuid.UUID, oid *uuid.UUID, _ domain.ReplaceInput) (domain.View, error) {
 	f.replaceOID = oid
 	return domain.View{}, f.err
+}
+
+// Delete records the ownership boundary supplied by the handler.
+func (f *testSecretService) Delete(_ context.Context, _ users.User, _ uuid.UUID, oid *uuid.UUID) error {
+	f.deleteOID = oid
+	return f.err
 }
 
 // AddBinding returns the configured result.
@@ -139,6 +146,23 @@ func TestOrganizationMutationCarriesMembershipBoundary(t *testing.T) {
 	}
 	if service.replaceOID == nil || *service.replaceOID != organization.ID {
 		t.Fatalf("organization boundary = %v, want %s", service.replaceOID, organization.ID)
+	}
+}
+
+// TestOrganizationDeleteCarriesMembershipBoundary checks tenant deletion routing.
+func TestOrganizationDeleteCarriesMembershipBoundary(t *testing.T) {
+	t.Parallel()
+	organization := organizations.Organization{ID: uuid.New(), Slug: "northstar"}
+	service := &testSecretService{}
+	request := httptest.NewRequest(http.MethodDelete, "/api/v1/organizations/northstar/secrets/"+uuid.NewString(), nil)
+	request.Header.Set("Authorization", "Bearer token")
+	response := httptest.NewRecorder()
+	secretTestHandler(organization, service).ServeHTTP(response, request)
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	if service.deleteOID == nil || *service.deleteOID != organization.ID {
+		t.Fatalf("organization boundary = %v, want %s", service.deleteOID, organization.ID)
 	}
 }
 

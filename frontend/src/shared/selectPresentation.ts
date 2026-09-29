@@ -34,6 +34,8 @@ const presentations: Record<string, SelectPresentation> = {
   draft: { icon: 'mdi-file-edit-outline', color: 'warning' },
   'expiring soon': { icon: 'mdi-clock-alert-outline', color: 'warning' },
   expired: { icon: 'mdi-calendar-remove-outline', color: 'error' },
+  'hide expired': { icon: 'mdi-eye-off-outline', color: 'medium-emphasis' },
+  'show expired': { icon: 'mdi-eye-outline', color: 'info' },
   interrupted: { icon: 'mdi-stop-circle-outline', color: 'error' },
   suspended: { icon: 'mdi-pause-circle-outline', color: 'error' },
   'action required': { icon: 'mdi-alert-circle-outline', color: 'warning' },

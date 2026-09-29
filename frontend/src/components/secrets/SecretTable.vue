@@ -3,7 +3,7 @@ import type { Secret, SecretSortBy, SortOrder } from '../../api/secrets'
 import DataTableEmptyRow from '../DataTableEmptyRow.vue'
 
 const props = defineProps<{ items: readonly Secret[]; loading: boolean; readonly?: boolean; platformReadonly?: boolean; sortBy: SecretSortBy; sortOrder: SortOrder }>()
-const emit = defineEmits<{ details: [secret: Secret]; replace: [secret: Secret]; bindings: [secret: Secret]; sort: [sortBy: SecretSortBy, sortOrder: SortOrder] }>()
+const emit = defineEmits<{ details: [secret: Secret]; replace: [secret: Secret]; bindings: [secret: Secret]; delete: [secret: Secret]; sort: [sortBy: SecretSortBy, sortOrder: SortOrder] }>()
 
 const formatDate = (value: string | null) => value ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value)) : 'No expiration'
 
@@ -49,6 +49,8 @@ function sortIcon(key: SecretSortBy) {
                 <template v-else>
                   <v-list-item prepend-icon="mdi-refresh" title="Replace value" @click="$emit('replace', secret)" />
                   <v-list-item prepend-icon="mdi-link-variant" title="Manage bindings" @click="$emit('bindings', secret)" />
+                  <v-divider />
+                  <v-list-item prepend-icon="mdi-delete-outline" title="Delete" base-color="error" @click="$emit('delete', secret)" />
                 </template>
               </v-list>
             </v-menu>
